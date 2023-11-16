@@ -1,0 +1,5 @@
+动漫花园:
+  addon: ?keyword=
+  expr: +
+  url:
+    https://share.dmhy.org/topics/rss/rss.xml: null
