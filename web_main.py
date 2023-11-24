@@ -18,9 +18,9 @@ footer {visibility: hidden;}
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 def get_current_rss_profile():
-    for i,(site, rules) in enumerate(anime_rss.items()):
+    for i,(site, params) in enumerate(anime_rss.items()):
         if i==st.session_state.state:
-            return site, rules
+            return site, params
 if st.sidebar.button("主页"):
     st.session_state.state = -1
     st.rerun()
@@ -34,7 +34,7 @@ else:
     yaml.dump(anime_rss, open("anime_rss.yaml", "w",encoding='utf-8'))
 #display rss list
 n_site=len(anime_rss)
-for i,(site, rules) in enumerate(anime_rss.items()):
+for i,(site, params) in enumerate(anime_rss.items()):
     if st.sidebar.button(f"{site}"):
         st.session_state.state = 0
 
@@ -62,7 +62,7 @@ if st.session_state.state == -1:
         rss_expr=st.text_input("Enter your rss regular express between keywords", placeholder='e.g. +')
     if st.button("Add"):
         # if rss_name not in anime_rss:
-            anime_rss[rss_name]={'url':{rss_link:None},'addon':rss_addon,'expr':rss_expr} #personal tasks goes under rss_link
+            anime_rss[rss_name]={'rss_link':rss_link,'addon':rss_addon,'expr':rss_expr,'tasks':[]} #personal tasks goes under rss_link
             with open("anime_rss.yaml", "w",encoding='utf-8') as f:
                 yaml.dump(anime_rss, f,allow_unicode=True)
             
@@ -71,11 +71,21 @@ if st.session_state.state == -1:
             st.rerun()
             # st.success('This is a success message!', icon="✅")
 else:
+    site, params=get_current_rss_profile()
     rule_name=st.text_input("Enter your rule name")
-    rule_keywords=st.text_input("Enter your rule keywords")
-    data_editor=st.data_editor({'A':{"n":1,"m":2},"B":{'n':3,'m':4}})
-    site,rules=get_current_rss_profile()
-    xml=list(rules['url'].keys())[0]
+    rule_keywords=st.text_input("Enter your rule keywords, separate by comma")
+    if st.button("Add"):
+        keyword_list=[keyword for keyword in rule_keywords.split(',') if keyword!='']
+        if len(keyword_list)!=0:
+            task={'rule_name':rule_name,'keywords':keyword_list,'update time':None}
+            anime_rss[site]['tasks'].append(task)
+            # st.write(anime_rss)
+            # with open("anime_rss.yaml", "w",encoding='utf-8') as f:
+            #     yaml.dump(anime_rss, f,allow_unicode=True)
+            # st.rerun()
+    # data_editor=st.data_editor({'A':{"n":1,"m":2},"B":{'n':3,'m':4}})
+    st.data_editor(anime_rss[site]['tasks'])
+    xml= params['rss_link']
     st.write(f"Current rss profile: {xml}")
     bt=rss2title_bt(xml)
     bt_pd=pd.DataFrame(bt).T
