@@ -3,6 +3,9 @@ import os
 import urllib.parse
 from typing import Optional
 import re
+import bencodepy
+import hashlib
+import base64
 # def download(url, location=None, stream=False):
 #     response = requests.get(url, stream=stream)
 #     # Check if the request was successful (status code 200)
@@ -73,6 +76,25 @@ def extract_episode_number(input_string):
     else:
         return None
     
+def is_magnet(url):
+    return url.startswith('magnet:?xt=urn:btih:')
+
+def torrent_to_magnet(torrent_url):
+    torrent=download(torrent_url)
+    # 解码种子文件
+    torrent = bencodepy.decode(torrent)
+
+    # 提取info字段并计算其SHA1哈希
+    info_hash = hashlib.sha1(bencodepy.encode(torrent[b'info'])).digest()
+
+    # Base32编码哈希值
+    encoded_hash = base64.b32encode(info_hash).decode()
+
+    # 构建磁力链接
+    magnet_link = f'magnet:?xt=urn:btih:{encoded_hash}'
+
+    return magnet_link
+    
 if __name__ == "__main__":
     print("Testing download function...")
     url='https://acg.rip/t/292293.torrent'
@@ -81,3 +103,7 @@ if __name__ == "__main__":
     input_string = "【幻月字幕组】【23年日剧】【呛人姐与心机妹】【07】【1080P】【中日双语】 "
     episode_number = extract_episode_number(input_string)
     print(episode_number)
+    print("Testing is_magnet function...")
+    print(is_magnet('magnet:?xt=urn:btih:cdd228527015a84768e8a4f6e47469b3f29b9e8c&tr=http://open.acgtracker.com:1096/announce'))
+    print("Testing torrent_to_magnet function...")
+    print(torrent_to_magnet('https://acg.rip/t/292293.torrent'))
