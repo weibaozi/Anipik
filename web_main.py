@@ -16,7 +16,8 @@ footer {visibility: hidden;}
 </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
+# Get the directory of the current script
+current_directory = os.path.dirname(os.path.abspath(__file__))
 def get_current_rss_profile():
     for i,(site, params) in enumerate(anime_rss.items()):
         if i==st.session_state.state:
@@ -25,13 +26,14 @@ if st.sidebar.button("主页"):
     st.session_state.state = -1
     st.rerun()
 #if anime_rss exist
-if os.path.exists("anime_rss.yaml"):
-    anime_rss = yaml.load(open("anime_rss.yaml", "r",encoding='utf-8'), Loader=yaml.FullLoader)
+anime_rss_dir=os.path.join(current_directory, "anime_rss.yaml")
+if os.path.exists(anime_rss_dir):
+    anime_rss = yaml.load(open(anime_rss_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
     if anime_rss is None:
         anime_rss={}
 else:
     anime_rss={}
-    yaml.dump(anime_rss, open("anime_rss.yaml", "w",encoding='utf-8'))
+    yaml.dump(anime_rss, open(anime_rss_dir, "w",encoding='utf-8'))
 #display rss list
 n_site=len(anime_rss)
 for i,(site, params) in enumerate(anime_rss.items()):
@@ -63,7 +65,7 @@ if st.session_state.state == -1:
     if st.button("Add"):
         # if rss_name not in anime_rss:
             anime_rss[rss_name]={'rss_link':rss_link,'addon':rss_addon,'expr':rss_expr,'tasks':[]} #personal tasks goes under rss_link
-            with open("anime_rss.yaml", "w",encoding='utf-8') as f:
+            with open(anime_rss_dir, "w",encoding='utf-8') as f:
                 yaml.dump(anime_rss, f,allow_unicode=True)
             
             rss_name=''
@@ -77,14 +79,18 @@ else:
     if st.button("Add"):
         keyword_list=[keyword for keyword in rule_keywords.split(',') if keyword!='']
         if len(keyword_list)!=0:
-            task={'rule_name':rule_name,'keywords':keyword_list,'update time':None}
+            task={'rule_name':rule_name,'keywords':keyword_list,'update time':None,'downloaded_episodes':[],'enable':True}
             anime_rss[site]['tasks'].append(task)
             # st.write(anime_rss)
-            # with open("anime_rss.yaml", "w",encoding='utf-8') as f:
-            #     yaml.dump(anime_rss, f,allow_unicode=True)
-            # st.rerun()
+            with open(anime_rss_dir, "w",encoding='utf-8') as f:
+                yaml.dump(anime_rss, f,allow_unicode=True)
+            st.rerun()
     # data_editor=st.data_editor({'A':{"n":1,"m":2},"B":{'n':3,'m':4}})
-    st.data_editor(anime_rss[site]['tasks'])
+    #reorder
+    df=pd.DataFrame(anime_rss[site]['tasks'])
+    desired_column_order = ['rule_name'] + [col for col in df.columns if col != 'rule_name']
+    df = df[desired_column_order]
+    st.data_editor(df)
     xml= params['rss_link']
     st.write(f"Current rss profile: {xml}")
     bt=rss2title_bt(xml)

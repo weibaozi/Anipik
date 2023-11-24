@@ -2,6 +2,7 @@ import requests
 import os
 import urllib.parse
 from typing import Optional
+import re
 # def download(url, location=None, stream=False):
 #     response = requests.get(url, stream=stream)
 #     # Check if the request was successful (status code 200)
@@ -58,7 +59,25 @@ def download(url, location=None, stream=False) -> Optional[bytes]:
     else:
         # print(f"Failed to download the file. Status code: {response.status_code}")
         return None
+def extract_episode_number(input_string):
+    # Define a regular expression pattern to match the episode number
+    pattern = r'\b\d+\b'
 
+    # Use re.search() to find the first match in the string
+    match = re.search(pattern, input_string)
+
+    # Check if a match was found
+    if match:
+        episode_number = match.group()
+        return episode_number
+    else:
+        return None
+    
 if __name__ == "__main__":
+    print("Testing download function...")
     url='https://acg.rip/t/292293.torrent'
     download(url,location='./')
+    print("Testing extract_episode_number function...")
+    input_string = "【幻月字幕组】【23年日剧】【呛人姐与心机妹】【07】【1080P】【中日双语】 "
+    episode_number = extract_episode_number(input_string)
+    print(episode_number)
