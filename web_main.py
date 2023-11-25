@@ -7,6 +7,8 @@ from utils import *
 from my_rss_parser import *
 from bt2magnet import *
 import pandas as pd
+from pikpakapi import PikPakApi
+import asyncio
 hide_streamlit_style = """
 <style>
 
@@ -34,6 +36,8 @@ if os.path.exists(anime_rss_dir):
 else:
     anime_rss={}
     yaml.dump(anime_rss, open(anime_rss_dir, "w",encoding='utf-8'))
+
+setting_dir=os.path.join(current_directory, "setting.yaml")
 #display rss list
 n_site=len(anime_rss)
 for i,(site, params) in enumerate(anime_rss.items()):
@@ -72,6 +76,28 @@ if st.session_state.state == -1:
             rss_link=''
             st.rerun()
             # st.success('This is a success message!', icon="✅")
+    pp_col1, pp_col2 = st.columns([1,1])
+    pikpak_username=pp_col1.text_input("Enter your pikpak username")
+    pikpak_password=pp_col2.text_input("Enter your pikpak password",type="password")
+    ppbutton_col1, ppbutton_col2 = st.columns([3,1])
+    if ppbutton_col1.button("Try Login"):
+        client = PikPakApi(
+                    username=pikpak_username,
+                    password=pikpak_password,
+                ) 
+        try:
+            asyncio.run(client.login())
+            st.success("Login success")
+        except:
+            st.error("Login failed")
+    
+    if ppbutton_col2.button("save to local"):
+        setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
+        setting['pikpak_username']=pikpak_username
+        setting['pikpak_password']=pikpak_password
+        yaml.dump(setting, open(setting_dir, "w",encoding='utf-8'),allow_unicode=True)
+        st.success("Saved to local")
+        
 else:
     site, params=get_current_rss_profile()
     rule_name=st.text_input("Enter your rule name")
@@ -88,9 +114,17 @@ else:
     # data_editor=st.data_editor({'A':{"n":1,"m":2},"B":{'n':3,'m':4}})
     #reorder
     df=pd.DataFrame(anime_rss[site]['tasks'])
-    desired_column_order = ['rule_name'] + [col for col in df.columns if col != 'rule_name']
+    desired_column_order = ['rule_name','keywords'] + [col for col in df.columns if col not in  ['rule_name','keywords']]
     df = df[desired_column_order]
     st.data_editor(df)
+
+    option = st.selectbox("Select a rule to edit", df['rule_name'])
+    if st.button("Delete"):
+        anime_rss[site]['tasks']=[task for task in anime_rss[site]['tasks'] if task['rule_name']!=option]
+        with open(anime_rss_dir, "w",encoding='utf-8') as f:
+            yaml.dump(anime_rss, f,allow_unicode=True)
+        st.rerun()
+
     xml= params['rss_link']
     st.write(f"Current rss profile: {xml}")
     bt=rss2title_bt(xml)
