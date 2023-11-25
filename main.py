@@ -18,8 +18,8 @@ lock = threading.Lock()
 #         print(f"successfully download {task_name} episode {episode_number}")
 #         anime_rss
 #     pass
-def download_helper(download_url,download_episodes,episode_number,location=current_directory):
-    if download(download_url[1],location=location,filename=download_url[0]):
+def download_helper(download_url,download_episodes,episode_number,location=current_directory,stream=False):
+    if download(download_url[1],location=location,filename=download_url[0],stream=stream):
         print(f"successfully download {download_url[0]}")
         with lock:
             download_episodes.append(episode_number)
@@ -91,6 +91,7 @@ while True:
             rss_search_url = rss_link+addon + expr.join(clean_keywords)
             # print(rss_search_url)
             my_parser = rss2title_bt(rss_search_url)
+            task_save_dir = os.path.join(location, rule_name)
             for title, content in my_parser.items():
                 url = content['url']
                 # print(title,url)
@@ -114,7 +115,7 @@ while True:
                     continue
                 print(download_url)
                 download_url=download_url[0]
-                thread = threading.Thread(target=download_helper, args=(download_url, downloaded_episodes, episode_number, location))
+                thread = threading.Thread(target=download_helper, args=(download_url, downloaded_episodes, episode_number, task_save_dir, True))
                 download_queue.append(thread)
 
                 temp_episodes.append(int(episode_number))
@@ -128,6 +129,7 @@ while True:
         thread.start()
     for thread in download_queue:
         thread.join()
+    yaml.dump(anime_rss, open(anime_rss_dir, "w", encoding='utf-8'), allow_unicode=True)
     print("all tasks completed")
     # print(download_queue)
     for i in tqdm(range(600)):

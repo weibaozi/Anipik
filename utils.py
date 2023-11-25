@@ -57,6 +57,13 @@ def download(url, location=None, stream=False,filename=None):
         # print(save_path)
         if location is not None:
             save_path = os.path.join(location, filename)
+            #make sure the directory exists
+            if not os.path.exists(location):
+                try:
+                    os.makedirs(location)
+                    #FileExistsError
+                except:
+                    pass
         # print(f"Saving file to {save_path}")
             if stream:
                 with open(save_path, 'wb') as file:
