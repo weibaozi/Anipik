@@ -95,6 +95,17 @@ def torrent_to_magnet(torrent_url):
 
     return magnet_link
     
+def parse_episode(episode_list: list):
+    l=set()
+    for episode in episode_list:
+        episode=str(episode)
+        if '-' in episode:
+            start,end=episode.split('-')
+            l.update(range(int(start),int(end)+1))
+        else:
+            l.add(int(episode))
+    return list(l)
+
 if __name__ == "__main__":
     print("Testing download function...")
     url='https://acg.rip/t/292293.torrent'

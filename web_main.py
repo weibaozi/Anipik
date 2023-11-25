@@ -106,24 +106,39 @@ else:
         keyword_list=[keyword for keyword in rule_keywords.split(',') if keyword!='']
         if len(keyword_list)!=0:
             task={'rule_name':rule_name,'keywords':keyword_list,'update time':None,'downloaded_episodes':[],'enable':True}
-            anime_rss[site]['tasks'].append(task)
+            anime_rss[site]['tasks'][rule_name]=task
             # st.write(anime_rss)
             with open(anime_rss_dir, "w",encoding='utf-8') as f:
                 yaml.dump(anime_rss, f,allow_unicode=True)
             st.rerun()
     # data_editor=st.data_editor({'A':{"n":1,"m":2},"B":{'n':3,'m':4}})
     #reorder
-    df=pd.DataFrame(anime_rss[site]['tasks'])
+    tasks_content= [rule_content for rule_name,rule_content in anime_rss[site]['tasks'].items()]
+    df=pd.DataFrame(tasks_content)
     desired_column_order = ['rule_name','keywords'] + [col for col in df.columns if col not in  ['rule_name','keywords']]
     df = df[desired_column_order]
     st.data_editor(df)
 
     option = st.selectbox("Select a rule to edit", df['rule_name'])
-    if st.button("Delete"):
-        anime_rss[site]['tasks']=[task for task in anime_rss[site]['tasks'] if task['rule_name']!=option]
-        with open(anime_rss_dir, "w",encoding='utf-8') as f:
-            yaml.dump(anime_rss, f,allow_unicode=True)
-        st.rerun()
+    if option:
+        task_col1, task_col2 = st.columns([1,1])
+        current_keywords= ','.join(df[df['rule_name']==option]['keywords'].values[0])
+        current_episodes=','.join(map(str,df[df['rule_name']==option]['downloaded_episodes'].values[0]))
+        keywords=task_col1.text_input("Keywords",current_keywords)
+        episodes=task_col2.text_input("downloaded_episodes",current_episodes)
+        if task_col1.button("Update"):
+            keyword_list=[keyword for keyword in keywords.split(',') if keyword!='']
+            episode_list=[episode for episode in episodes.split(',') if episode!='']
+            anime_rss[site]['tasks'][option]['keywords']=keyword_list
+            anime_rss[site]['tasks'][option]['downloaded_episodes']=parse_episode(episode_list)
+            with open(anime_rss_dir, "w",encoding='utf-8') as f:
+                yaml.dump(anime_rss, f,allow_unicode=True)
+            pass
+        if task_col2.button("Delete"):
+            anime_rss[site]['tasks'].pop(option)
+            with open(anime_rss_dir, "w",encoding='utf-8') as f:
+                yaml.dump(anime_rss, f,allow_unicode=True)
+            st.rerun()
 
     xml= params['rss_link']
     st.write(f"Current rss profile: {xml}")
