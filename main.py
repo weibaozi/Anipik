@@ -108,13 +108,13 @@ while True:
                     if url is None:
                         print('error download url', title)
                         continue
-                print(episode_number,temp_episodes)
+                print(rule_name,episode_number)
                 download_url = asyncio.run(magnet_to_download_url(
                     client=client, magnet_links=[url]))
                 if len(download_url) == 0:
                     print('error download url', title)
                     continue
-                print(download_url)
+                # print(download_url)
                 download_url=download_url[0]
                 thread = threading.Thread(target=download_helper, args=(download_url, downloaded_episodes, episode_number, task_save_dir, True))
                 download_queue.append(thread)
@@ -137,5 +137,6 @@ while True:
         setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
         if 'rerun' in setting and setting['rerun']==True:
             setting['rerun']=False
+            yaml.dump(setting, open(setting_dir, "w",encoding='utf-8'),allow_unicode=True)
             break
         time.sleep(1)
