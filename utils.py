@@ -83,17 +83,15 @@ def download(url, location=None, stream=False,filename=None):
         return None
 def extract_episode_number(input_string):
     # Define a regular expression pattern to match the episode number
-    pattern = r'\b\d+\b'
-
-    # Use re.search() to find the first match in the string
-    match = re.search(pattern, input_string)
-
-    # Check if a match was found
-    if match:
-        episode_number = match.group()
-        return episode_number
-    else:
-        return None
+    patterns = [r'\b\d{2}\b',r'\b\d+\b']
+    for pattern in patterns:
+        # Use re.search() to find the first match in the string
+        match = re.search(pattern, input_string)
+        # Check if a match was found
+        if match:
+            episode_number = match.group()
+            return episode_number
+    return None
     
 def is_magnet(url):
     return url.startswith('magnet:?xt=urn:btih:')
