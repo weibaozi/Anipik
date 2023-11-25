@@ -38,6 +38,7 @@ else:
     yaml.dump(anime_rss, open(anime_rss_dir, "w",encoding='utf-8'))
 
 setting_dir=os.path.join(current_directory, "setting.yaml")
+setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
 #display rss list
 n_site=len(anime_rss)
 for i,(site, params) in enumerate(anime_rss.items()):
@@ -97,6 +98,10 @@ if st.session_state.state == -1:
         setting['pikpak_password']=pikpak_password
         yaml.dump(setting, open(setting_dir, "w",encoding='utf-8'),allow_unicode=True)
         st.success("Saved to local")
+    location=st.text_input("Enter your download location",value=setting['location'] if 'location' in setting else '')
+    if st.button("save"):
+        setting['location']=location
+        yaml.dump(setting, open(setting_dir, "w",encoding='utf-8'),allow_unicode=True)
         
 else:
     site, params=get_current_rss_profile()

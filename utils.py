@@ -22,8 +22,15 @@ import base64
 #             f"Failed to download the file. Status code: {response.status_code}")
 #         return False
 
+def has_file_extension(url):
+    # Regular expression to match a file extension at the end of a URL
+    # This regex looks for a period followed by a sequence of alphanumeric characters
+    # and underscores at the end of the string
+    pattern = r"\.\w+$"
+    
+    return re.search(pattern, url) is not None
 
-def download(url, location=None, stream=False) -> Optional[bytes]:
+def download(url, location=None, stream=False,filename=None):
     """
     Download a file from the given URL and save it to the current directory
 
@@ -40,10 +47,14 @@ def download(url, location=None, stream=False) -> Optional[bytes]:
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
         # Get the file name
-
-        filename = os.path.basename(url)
-        filename = urllib.parse.unquote(filename)
+        if filename is None:
+            if has_file_extension(url):
+                filename = os.path.basename(url)
+                filename = urllib.parse.unquote(filename)
+            else:
+                filename = "downloaded_file"
         save_path = filename
+        # print(save_path)
         if location is not None:
             save_path = os.path.join(location, filename)
         # print(f"Saving file to {save_path}")
@@ -54,11 +65,12 @@ def download(url, location=None, stream=False) -> Optional[bytes]:
             else:
                 with open(save_path, 'wb') as file:
                     file.write(response.content)
+            # print(f"File downloaded and saved as {save_path}")
+            return True
         else:
             return response.content
 
-        # print(f"File downloaded and saved as {save_path}")
-        return None
+        
     else:
         # print(f"Failed to download the file. Status code: {response.status_code}")
         return None

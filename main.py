@@ -19,12 +19,12 @@ lock = threading.Lock()
 #         anime_rss
 #     pass
 def download_helper(download_url,download_episodes,episode_number,location=current_directory):
-    if download(download_url.items()[1],location=location):
-        print(f"successfully download {download_url.items()[0]}")
+    if download(download_url[1],location=location,filename=download_url[0]):
+        print(f"successfully download {download_url[0]}")
         with lock:
             download_episodes.append(episode_number)
     else:
-        print(f"failed to download {download_url.items()[0]}")
+        print(f"failed to download {download_url[0]}")
 
 while True:
     # Get the directory of the current script
@@ -77,6 +77,8 @@ while True:
         expr = content['expr']
         rss_link = content['rss_link']
         tasks = content['tasks']
+        # print(location,tasks)
+        # break
         for _,task in tasks.items():
             rule_name = task['rule_name']
             if task['enable'] == False:
@@ -87,7 +89,7 @@ while True:
             # strip to get rid of the space
             clean_keywords = [keyword.strip() for keyword in keywords]
             rss_search_url = rss_link+addon + expr.join(clean_keywords)
-            print(rss_search_url)
+            # print(rss_search_url)
             my_parser = rss2title_bt(rss_search_url)
             for title, content in my_parser.items():
                 url = content['url']
@@ -95,24 +97,27 @@ while True:
                 episode_number = extract_episode_number(title)
                 if episode_number is None:
                     continue
+                episode_number=int(episode_number)
                 if episode_number in temp_episodes:
+                    # print(f"episode {episode_number} already downloaded")
                     continue
                 if not is_magnet(url):
                     url = torrent_to_magnet(url)
                     if url is None:
                         print('error download url', title)
                         continue
-
+                print(episode_number,temp_episodes)
                 download_url = asyncio.run(magnet_to_download_url(
                     client=client, magnet_links=[url]))
                 if len(download_url) == 0:
                     print('error download url', title)
                     continue
+                print(download_url)
                 download_url=download_url[0]
                 thread = threading.Thread(target=download_helper, args=(download_url, downloaded_episodes, episode_number, location))
                 download_queue.append(thread)
 
-                temp_episodes.append(episode_number)
+                temp_episodes.append(int(episode_number))
                 # break
                 # download(url)
                 # print(filename)

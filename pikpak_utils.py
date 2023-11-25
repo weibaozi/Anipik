@@ -14,7 +14,7 @@ async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=N
     # print(json.dumps(client.get_user_info(), indent=4))
     print("=" * 30, end="\n\n")
     file_ids={}
-    download_urls={}
+    download_urls=[]
     # offline_download
     if magnet_links is not None:
         for magnet_link in magnet_links:
@@ -56,7 +56,7 @@ async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=N
                         )
                     #parse js
                     js=json.loads(js)
-                    download_urls[js['name']]=js['web_content_link']
+                    download_urls.append((js['name'],js['web_content_link']))
                     file_ids.pop(magnet_link)
                 except Exception as e:
                     print(e)
