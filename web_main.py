@@ -5,7 +5,6 @@ import yaml
 import os
 from utils import *
 from my_rss_parser import *
-from bt2magnet import *
 import pandas as pd
 from pikpakapi import PikPakApi
 import asyncio
@@ -107,10 +106,12 @@ else:
     site, params=get_current_rss_profile()
     rule_name=st.text_input("Enter your rule name")
     rule_keywords=st.text_input("Enter your rule keywords, separate by comma")
+    downloaded_episodes=st.text_input("Enter your downloaded episodes, separate by comma (defualt: download all episodes))",value='')
     if st.button("Add"):
         keyword_list=[keyword for keyword in rule_keywords.split(',') if keyword!='']
+        episodes=parse_episode([episode for episode in downloaded_episodes.split(',') if episode!=''])
         if len(keyword_list)!=0:
-            task={'rule_name':rule_name,'keywords':keyword_list,'update time':None,'downloaded_episodes':[],'enable':True}
+            task={'rule_name':rule_name,'keywords':keyword_list,'update time':None,'downloaded_episodes':episodes,'enable':True}
             anime_rss[site]['tasks'][rule_name]=task
             # st.write(anime_rss)
             with open(anime_rss_dir, "w",encoding='utf-8') as f:
