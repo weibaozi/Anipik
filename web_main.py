@@ -101,6 +101,11 @@ if st.session_state.state == -1:
     if st.button("save"):
         setting['location']=location
         yaml.dump(setting, open(setting_dir, "w",encoding='utf-8'),allow_unicode=True)
+    rerun=st.button("rerun main.py")
+    if rerun:
+        setting['rerun']=True
+        yaml.dump(setting, open(setting_dir, "w",encoding='utf-8'),allow_unicode=True)
+        st.rerun()
         
 else:
     site, params=get_current_rss_profile()

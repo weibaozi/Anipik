@@ -11,7 +11,10 @@ import asyncio
 import threading
 
 global anime_rss
+# Get the directory of the current script
 current_directory = os.path.dirname(os.path.abspath(__file__))
+setting_dir = os.path.join(current_directory, "setting.yaml")
+anime_rss_dir = os.path.join(current_directory, 'anime_rss.yaml')
 lock = threading.Lock()
 # def download_helper(download_url,rss_name,task_name,episode_number,location=current_directory):
 #     if download(download_url,location=location):
@@ -27,10 +30,7 @@ def download_helper(download_url,download_episodes,episode_number,location=curre
         print(f"failed to download {download_url[0]}")
 
 while True:
-    # Get the directory of the current script
     
-    # Construct the path to the file you want to check
-    setting_dir = os.path.join(current_directory, "setting.yaml")
     # check default setting file:
     if not os.path.exists(setting_dir):
         print("setting.yaml not found, creating one...")
@@ -38,15 +38,16 @@ while True:
         yaml.dump(setting, open(setting_dir, "w", encoding='utf-8'),Loader=yaml.FullLoader)
     setting = yaml.load(
         open(setting_dir, "r", encoding='utf-8'), Loader=yaml.FullLoader)
-    
 
     # check default anime_rss file:
-    anime_rss_dir = os.path.join(current_directory, 'anime_rss.yaml')
+    
     if not os.path.exists(anime_rss_dir):
         print("anime_rss.yaml not found, creating one...")
         anime_rss = {}
         yaml.dump(anime_rss, open(anime_rss_dir, "w", encoding='utf-8'))
     anime_rss = yaml.load(open(anime_rss_dir, 'r',encoding='utf-8'), Loader=yaml.FullLoader)
+
+
     # create client
     while True:
         if 'pikpak_password' not in setting or 'pikpak_username' not in setting:
@@ -133,4 +134,8 @@ while True:
     print("all tasks completed")
     # print(download_queue)
     for i in tqdm(range(600)):
+        setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
+        if 'rerun' in setting and setting['rerun']==True:
+            setting['rerun']=False
+            break
         time.sleep(1)
