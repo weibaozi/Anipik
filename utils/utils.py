@@ -8,6 +8,7 @@ import hashlib
 import base64
 from bs4 import BeautifulSoup
 import yaml
+import time
 # def download(url, location=None, stream=False):
 #     response = requests.get(url, stream=stream)
 #     # Check if the request was successful (status code 200)
@@ -158,6 +159,22 @@ def send_wechat(message,setting,notify_queue_dir,wechat_id='ALL'):
     else:
         notify_queue[wechat_id].append(message)
     yaml.dump(notify_queue, open(notify_queue_dir, "w",encoding='utf-8'), allow_unicode=True)
+    
+def safe_load_yaml(file):
+    for _ in range(10):
+        f=yaml.load(open(file, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        if f is not None:
+            return f
+
+def safe_dump_yaml(data,file):
+    for _ in range(10):
+        try:
+            yaml.dump(data, open(file, "w",encoding='utf-8'), allow_unicode=True)
+            return
+        except yaml.scanner.ScannerError:
+            print('yaml error')
+            time.sleep(0.1)
+            continue
 
 if __name__ == "__main__":
     print("Testing download function...")
