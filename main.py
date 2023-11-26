@@ -30,8 +30,9 @@ notify_queue_dir=os.path.join(current_directory, "wechatbot","notify_queue.yaml"
 def download_helper(download_url,download_episodes,episode_number,location=current_directory,stream=False):
     if download(download_url[1],location=location,filename=download_url[0],stream=stream):
         print(f"successfully download {download_url[0]}")
+        setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
         if setting['wechat']==True:
-            send_wechat(f"完成下载: {download_url[0]}")
+            send_wechat(f"完成下载: {download_url[0]}",setting,notify_queue_dir)
         with lock:
             download_episodes.append(episode_number)
     else:
