@@ -1,10 +1,10 @@
 import yaml
 import os
-from my_rss_parser import rss2title_bt
+# from utils import *
+from utils.pikpak_utils import magnet_to_download_url
+from utils.utils import *
 from pikpakapi import PikPakApi
-from pikpak_utils import magnet_to_download_url
-import asyncio
-from utils import *
+
 import time
 from tqdm import tqdm
 import asyncio
@@ -16,6 +16,7 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 setting_dir = os.path.join(current_directory, "setting.yaml")
 anime_rss_dir = os.path.join(current_directory, 'anime_rss.yaml')
 lock = threading.Lock()
+setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
 # def download_helper(download_url,rss_name,task_name,episode_number,location=current_directory):
 #     if download(download_url,location=location):
 #         print(f"successfully download {task_name} episode {episode_number}")
@@ -24,6 +25,8 @@ lock = threading.Lock()
 def download_helper(download_url,download_episodes,episode_number,location=current_directory,stream=False):
     if download(download_url[1],location=location,filename=download_url[0],stream=stream):
         print(f"successfully download {download_url[0]}")
+        if setting['wechat']==True:
+            send_wechat(f"successfully download {download_url[0]}")
         with lock:
             download_episodes.append(episode_number)
     else:
@@ -87,7 +90,7 @@ while True:
             downloaded_episodes = task['downloaded_episodes']
             temp_episodes=downloaded_episodes.copy()
             keywords = task['keywords']
-            # strip to get rid of the space
+            # strip to get rid of the space at the beginning and end of the string  
             clean_keywords = [keyword.strip() for keyword in keywords]
             rss_search_url = rss_link+addon + expr.join(clean_keywords)
             # print(rss_search_url)
@@ -118,13 +121,8 @@ while True:
                 download_url=download_url[0]
                 thread = threading.Thread(target=download_helper, args=(download_url, downloaded_episodes, episode_number, task_save_dir, True))
                 download_queue.append(thread)
-
                 temp_episodes.append(int(episode_number))
-                # break
-                # download(url)
-                # print(filename)
-                # d
-            # print(len(my_parser))
+
     #print(anime_rss)
     for thread in download_queue:
         thread.start()

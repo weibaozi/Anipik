@@ -1,4 +1,4 @@
-from utils import download
+from .utils import download
 from bs4 import BeautifulSoup
 from typing import List, Dict, Tuple, Optional, Union
 
