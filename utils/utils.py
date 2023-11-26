@@ -7,6 +7,7 @@ import bencodepy
 import hashlib
 import base64
 from bs4 import BeautifulSoup
+import yaml
 # def download(url, location=None, stream=False):
 #     response = requests.get(url, stream=stream)
 #     # Check if the request was successful (status code 200)
@@ -145,6 +146,18 @@ def rss2title_bt(rss_url) -> Dict[str, str]:
             anime_bt_urls[item.title.text]={'url':url,'link':link,'date':date}
     # print(anime_bt_urls)
     return anime_bt_urls
+def send_wechat(message,setting,notify_queue_dir,wechat_id='ALL'):
+    notify_queue=yaml.load(open(notify_queue_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
+    if notify_queue is None:
+        notify_queue={}
+    if wechat_id=='ALL':
+        for id in setting['wechat_id']:
+            if id not in notify_queue:
+                notify_queue[id]=[]
+            notify_queue[id].append(message)
+    else:
+        notify_queue[wechat_id].append(message)
+    yaml.dump(notify_queue, open(notify_queue_dir, "w",encoding='utf-8'), allow_unicode=True)
 
 if __name__ == "__main__":
     print("Testing download function...")

@@ -7,9 +7,13 @@ from queue import Queue
 import os
 from datetime import datetime
 from multiprocessing.dummy import Pool
+import yaml
+import time
 
 # 当前目录路径
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+current_directory = os.path.dirname(os.path.abspath(__file__))
+print(current_directory)
+notify_queue_dir=os.path.join(current_directory, "wechatbot","message_queue.yaml")
 
 logging.basicConfig(level=logging.INFO)  # 日志器
 msg_queue = Queue()  # 消息队列
@@ -108,57 +112,30 @@ def main():
     print(lists)
 
     # 发送文本消息
-    w.send_text(to_wx="filehelper", msg='作者QQ:\r437382693')
+    w.send_text(to_wx="wxid_4p5fzh6x73zn11", msg='微信bot已启动')
     time.sleep(1)
     # 处理消息回调【具体根据自己的业务来写，这里只是一个简陋的演示】
     while True:
-        print("test")
-        msg = msg_queue.get()
-
-        # 正常消息
-        if msg["type"] == 100:
-            # 自己发送的消息
-            if msg["is_self_msg"]:
-                print("收到了自己发送的消息！")
-
-            # 别人发送的消息
-            else:
-                if msg["msg_type"] == 37:
-                    # 同意添加好友申请
-                    w.agree_friend(msg_data=msg)
-
-                # 处理图片消息
-                elif msg["msg_type"] == 3:
-                    file_path, file_name = os.path.split(msg["file_path"])
-                    if file_name.endswith("dat"):
-                        cur_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S ")
-                        file_name = cur_time + file_name.replace(".dat", "")
-                        print(file_name)
-
-                        # 这里睡2秒是防止某些图片过大，还未完全下载完毕
-                        # time.sleep(2)
-
-                        # 保存图片
-                        # w.save_img(
-                        #     save_path=os.path.join(BASE_DIR, "temp\\{}.png".format(file_name)),
-                        #     msg_data=msg,
-                        # )
-
-                # 收款
-                elif msg["msg_type"] == 490:
-                    is_recv = msg["detail"]["is_recv"]
-                    if is_recv:
-                        # 收款
-                        w.collection(msg_data=msg)
-
-                # 如果是XXX发来的信息，转发消息【异步】
-                if msg["wx_id"] == "wxid_xxx":
-                    pool.apply_async(forward, (w, msg))
-
-        # 撤回消息
-        # 注意：撤回消息中的参数，跟正常消息的参数不一致，可自行判断type是否是666，分别放到不同的队列中处理
-        elif msg["type"] == 666:
-            print("{} 撤回消息：{}".format(msg["wx_id"], msg["content"]))
+        
+        notify=yaml.load(open(notify_queue_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
+        notify_copy=notify.copy()
+        for id, messages in notify_copy.items():
+            for message in messages:
+                w.send_text(to_wx=id, msg=message)
+                notify[id].remove(message)
+        notify_check=yaml.load(open(notify_queue_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
+        #check if notify changes after read
+        if notify_check==notify:
+            yaml.dump(notify, open(notify_queue_dir, "w",encoding='utf-8'), allow_unicode=True)
+        else:
+            new_notify=yaml.load(open(notify_queue_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
+            #remove sended messages
+            for id, messages in notify_copy.items():
+                for message in messages:
+                    new_notify[id].remove(message)
+            yaml.dump(new_notify, open(notify_queue_dir, "w",encoding='utf-8'), allow_unicode=True)
+        time.Sleep(1)
+        
 
 
 if __name__ == '__main__':
