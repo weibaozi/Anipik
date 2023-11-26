@@ -4,7 +4,7 @@ import time
 import asyncio
 import os
 import yaml
-TOKEN ='MTE3ODQwNTU4ODEyOTAzODQ0Ng.GufgFH.A9QkV9071G_oC2DlOYvNBdzMg3rmC759ZvlUg0'
+TOKEN =''
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 parent_directory = os.path.dirname(current_directory)
