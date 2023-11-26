@@ -1,5 +1,5 @@
 # 如果你是Python36。请删除37、38、39的pyd文件，其他版本同理
-from WeChatPYAPI import WeChatPYApi
+from .WeChatPYAPI import WeChatPYApi
 
 import time
 import logging
@@ -9,6 +9,7 @@ from datetime import datetime
 from multiprocessing.dummy import Pool
 import yaml
 import time
+import copy
 
 # 当前目录路径
 current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -116,9 +117,8 @@ def main():
     time.sleep(1)
     # 处理消息回调【具体根据自己的业务来写，这里只是一个简陋的演示】
     while True:
-        
         notify=yaml.load(open(notify_queue_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
-        notify_copy=notify.copy()
+        notify_copy=copy.deepcopy(notify)
         for id, messages in notify_copy.items():
             for message in messages:
                 w.send_text(to_wx=id, msg=message)
@@ -134,7 +134,7 @@ def main():
                 for message in messages:
                     new_notify[id].remove(message)
             yaml.dump(new_notify, open(notify_queue_dir, "w",encoding='utf-8'), allow_unicode=True)
-        time.Sleep(1)
+        time.sleep(3)
         
 
 
