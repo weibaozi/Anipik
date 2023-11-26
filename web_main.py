@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 import yaml
 import os
-from utils import *
-from my_rss_parser import *
+from utils.utils import *
 import pandas as pd
 from pikpakapi import PikPakApi
 import asyncio
