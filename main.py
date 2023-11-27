@@ -9,6 +9,7 @@ import time
 from tqdm import tqdm
 import asyncio
 import threading
+from chatbot.notify import *
 
 global anime_rss
 # Get the directory of the current script
@@ -32,7 +33,7 @@ def download_helper(download_url,download_episodes,episode_number,location=curre
         print(f"successfully download {download_url[0]}")
         setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
         if setting['wechat']==True:
-            send_wechat(f"完成下载: {download_url[0]}",setting,notify_queue_dir)
+            notify_discord(f"完成下载: {download_url[0]}",setting)
         with lock:
             download_episodes.append(episode_number)
     else:
