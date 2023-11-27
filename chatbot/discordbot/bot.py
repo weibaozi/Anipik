@@ -31,6 +31,11 @@ def run_bot(TOKEN=TOKEN):
         await notify_send()
 
     @client.event
+    async def on_resumed():
+        print(f'{client.user} has resumed to Discord!')
+        await notify_send()
+
+    @client.event
     async def on_message(message):
         if message.author == client.user:
             return
