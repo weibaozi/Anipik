@@ -41,7 +41,10 @@ def run_bot(TOKEN=TOKEN):
 
         if user_message[0] == '!':
             command=user_message[1:]
-            await send_message(message,command,True)
+            is_private=isinstance(message.channel,discord.DMChannel)
+            await send_message(message,command,is_private)
+
+    #handle notify queue
     async def notify_send():
 
         while True:

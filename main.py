@@ -33,7 +33,7 @@ def download_helper(download_url,download_episodes,episode_number,location=curre
         print(f"successfully download {download_url[0]}")
         setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
         if setting['wechat']==True:
-            notify_discord(f"完成下载: {download_url[0]}",setting)
+            notify_discord(f"完成下载: {download_url[0]}",setting,user_id='406867080210677760')
         with lock:
             download_episodes.append(episode_number)
     else:
