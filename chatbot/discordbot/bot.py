@@ -17,7 +17,7 @@ async def send_message(message,user_message,is_private):
     except Exception as e:
         print(e)
 
-def run_bot():
+def run_bot(TOKEN=TOKEN):
     
     intents=discord.Intents.default()
     intents.members=True
