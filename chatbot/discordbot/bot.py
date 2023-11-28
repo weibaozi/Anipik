@@ -4,6 +4,7 @@ import time
 import asyncio
 import os
 import yaml
+from discord.ext import commands, tasks
 TOKEN =''
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -28,12 +29,37 @@ def run_bot(TOKEN=TOKEN):
     @client.event
     async def on_ready():
         print(f'{client.user} has connected to Discord!')
-        await notify_send()
+        test_notify.start()
+        # await notify_send()
 
     @client.event
     async def on_resumed():
         print(f'{client.user} has resumed to Discord!')
-        await notify_send()
+        # await notify_send()
+
+    @tasks.loop(seconds=2)
+    async def test_notify():
+        print("test")
+        with open (notify_queue_dir,'r+',encoding='utf-8') as f:
+            notify_queue=yaml.load(f, Loader=yaml.FullLoader)
+            if notify_queue is None:
+                return
+            for user_id,messages in notify_queue['discord_user'].items():
+                try:
+                    user=await client.fetch_user(user_id)
+                    while len(messages)>0:
+                        await user.send(messages.pop(0))
+                except discord.user.NotFound:
+                    print(f"discord user {user_id} not found")
+            
+            for channel_id,messages in notify_queue['discord_channel'].items():
+                try:
+                    channel=await client.fetch_channel(channel_id)
+                    while len(messages)>0:
+                        await channel.send(messages.pop(0))
+                except discord.channel.NotFound:
+                    print(f"discord channel {channel_id} not found")
+            yaml.dump(notify_queue, open(notify_queue_dir, "w",encoding='utf-8'), allow_unicode=True)
 
     @client.event
     async def on_message(message):
