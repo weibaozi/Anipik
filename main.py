@@ -59,7 +59,8 @@ while True:
 
 
     # create client
-    while True:
+    login=False
+    while not login:
         if 'pikpak_password' not in setting or 'pikpak_username' not in setting:
             print("username or password not found in setting.yaml, please fill in your pikpak account")
             setting['pikpak_username'] = input("username:")
@@ -68,15 +69,22 @@ while True:
             username=setting['pikpak_username'],
             password=setting['pikpak_password'],
         )
-        try:
-            asyncio.run(client.login())
-            yaml.dump(setting, open(setting_dir, "w",
-                    encoding='utf-8'), allow_unicode=True)
-            break
-        except:
-            print("login failed, please check your username and password")
-            setting['pikpak_username'] = input("username:")
-            setting['pikpak_password'] = input("password:")
+        #try login 5 times
+        for i in range(5):
+            try:
+                print("logging in... time:",i+1)
+                asyncio.run(client.login())
+                yaml.dump(setting, open(setting_dir, "w",
+                        encoding='utf-8'), allow_unicode=True)
+                login=True
+                break
+            except:
+                time.sleep(i*5)
+                if i==4:
+                    print("login failed, please check your username and password")
+                    setting['pikpak_username'] = input("username:")
+                    setting['pikpak_password'] = input("password:")
+                
     if 'location' not in setting:
         location = current_directory
     else:

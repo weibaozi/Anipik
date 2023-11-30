@@ -45,7 +45,10 @@ def run_bot(TOKEN=TOKEN):
             if notify_queue is None:
                 return
             for user_id,messages in notify_queue['discord_user'].items():
+                if len(messages)==0: #reduce api call
+                    continue
                 try:
+                    print(f"send to {user_id}")
                     user=await client.fetch_user(user_id)
                     while len(messages)>0:
                         await user.send(messages.pop(0))
@@ -53,7 +56,10 @@ def run_bot(TOKEN=TOKEN):
                     print(f"discord user {user_id} not found")
             
             for channel_id,messages in notify_queue['discord_channel'].items():
+                if len(messages)==0: #reduce api call
+                    continue
                 try:
+                    print(f"send to {channel_id}")
                     channel=await client.fetch_channel(channel_id)
                     while len(messages)>0:
                         await channel.send(messages.pop(0))
