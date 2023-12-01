@@ -1,4 +1,5 @@
 ﻿# Anipik
+这是一个rss订阅从pikpak自动下番的python脚本,可以自定义规则,并且可以通过discord bot进行通知
 **Features:**
 - [x] RSS feed from anime sites
 - [x] custom anime rules(keywords,episodes)
@@ -13,7 +14,7 @@
 pip install -r requirements.txt
 ```
 
-3. 在setting.yaml里填写pikpak账号密码和下载路径:
+1. 在setting.yaml里填写pikpak账号密码和下载路径:
 
 
  location: 
