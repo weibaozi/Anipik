@@ -1,0 +1,14 @@
+discord: true
+discord_id:
+  channel_id:
+  - 'abc'
+  user_id:
+  - 'bab'
+discord_token: 
+location: N:\新番
+pikpak_password: abc
+pikpak_username: abc
+rerun: false
+wechat: false
+wechat_id:
+- abc
