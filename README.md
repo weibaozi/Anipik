@@ -7,18 +7,25 @@
 
 **使用方法**
 
-在setting.yaml里填写pikpak账号密码和下载路径:
+1. 安装python3.9+
+2. 安装依赖库
+```
+pip install -r requirements.txt
+```
 
-location: 
+3. 在setting.yaml里填写pikpak账号密码和下载路径:
 
-pikpak_password: abc
 
-pikpak_username: abc
+ location: 
 
-之后run main和web
+ pikpak_password: 
 
----
-bot不用就不需要更改
-目前wechatbot无法使用,可以使用discordbot
-填写token和你的频道channel后启动**run dcbot.bat**
+ pikpak_username: 
+
+4. 启动**run main.bat**, **run web.bat**
+
+5. (可选)目前wechatbot无法使用,可以使用discordbot填写token和你的频道channel id后启动**run dcbot.bat**
+
+6. 在默认浏览器打开后填写对应规则,默认带了一个动漫花园和咒术回战的task,可以自行删除
+
   
