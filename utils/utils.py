@@ -175,6 +175,16 @@ def safe_dump_yaml(data,file):
             print('yaml error')
             time.sleep(0.1)
             continue
+
+def safe_dump_yaml(data,file):
+    for _ in range(10):
+        try:
+            yaml.dump(data, open(file, "w",encoding='utf-8'), allow_unicode=True)
+            return
+        except yaml.scanner.ScannerError:
+            print('yaml error')
+            time.sleep(0.1)
+            continue
 def rename_folder(old,new,location=''):
     old='test'
     old=os.path.join(location,old)
@@ -192,7 +202,7 @@ def rename_folder(old,new,location=''):
         print('rename success')
     except Exception as e:
         print('rename fail',e)
-        
+
 if __name__ == "__main__":
     print("Testing download function...")
     url='https://acg.rip/t/292293.torrent'

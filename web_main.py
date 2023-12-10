@@ -166,8 +166,6 @@ else:
     bt_pd=pd.DataFrame(bt).T
     st.dataframe(bt_pd,width=1000)
 
-
-
 if st.sidebar.button("refresh"):
     st.session_state.state = 0
     #st.cache.clear()
