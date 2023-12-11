@@ -1,0 +1,15 @@
+location: N:\新番
+pikpak_password: '123'
+pikpak_username: '123'
+rerun: false
+wechat: false
+wechat_id: 
+- '123'
+discord: true
+discord_id:
+  user_id:
+  - '4123'
+  channel_id:
+  - '123'
+discord_token: ''
+
