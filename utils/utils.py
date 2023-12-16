@@ -46,7 +46,13 @@ def download(url, location=None, stream=False,filename=None):
     bytes: binary file content if location is None, None otherwise
 
     """
-    response = requests.get(url, stream=stream)
+    #check url starts with http
+    if not url.startswith('http'):
+        url='http://'+url
+    try:
+        response = requests.get(url, stream=stream)
+    except:
+        return False
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
         # Get the file name
