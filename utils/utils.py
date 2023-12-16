@@ -182,6 +182,22 @@ def safe_dump_yaml(data,file):
             time.sleep(0.1)
             continue
 
+def rename_folder(old,new,location=''):
+    old=os.path.join(location,old)
+    new=os.path.join(location,new)
+    try:
+        if os.path.exists(new):
+            #move file under old to new
+            for file in os.listdir(old):
+                os.rename(os.path.join(old,file),os.path.join(new,file))
+            #delete old folder
+            os.rmdir(old)
+        else:
+            os.rename(old,new)
+        print('rename success')
+    except Exception as e:
+        print('rename fail',e)
+
 if __name__ == "__main__":
     print("Testing download function...")
     url='https://acg.rip/t/292293.torrent'
