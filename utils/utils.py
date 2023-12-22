@@ -50,7 +50,7 @@ def download(url, location=None, stream=False,filename=None):
     if not url.startswith('http'):
         url='http://'+url
     try:
-        response = requests.get(url, stream=stream)
+        response = requests.get(url, stream=stream,timeout=30)
     except:
         return False
     # Check if the request was successful (status code 200)

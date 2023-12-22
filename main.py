@@ -38,7 +38,7 @@ def download_helper(download_url, download_episodes, episode_number, location=cu
             open(setting_dir, "r", encoding='utf-8'), Loader=yaml.FullLoader)
         if setting['discord'] == True:
             notify_discord(
-                f"完成下载: {download_url[0]}", setting, user_id='406867080210677760')
+                f"完成下载: {download_url[0]}", setting)
         with lock:
             download_episodes.append(episode_number)
     else:
@@ -49,7 +49,6 @@ def download_helper(download_url, download_episodes, episode_number, location=cu
 
 
 while True:
-
     # check default setting file:
     if not os.path.exists(setting_dir):
         print("setting.yaml not found, creating one...")
@@ -83,7 +82,7 @@ while True:
         # try login 5 times
         for i in range(5):
             try:
-                print("logging in... time:", i+1)
+                print("logging in... Current time:", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))) 
                 asyncio.run(client.login())
                 yaml.dump(setting, open(setting_dir, "w",
                                         encoding='utf-8'), allow_unicode=True)
@@ -157,7 +156,7 @@ while True:
         thread.join()
     yaml.dump(anime_rss, open(anime_rss_dir, "w",
               encoding='utf-8'), allow_unicode=True)
-    print("all tasks completed")
+    # print("all tasks completed")
     # print(download_queue)
     for i in tqdm(range(600)):
         setting = yaml.load(
