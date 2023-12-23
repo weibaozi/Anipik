@@ -120,6 +120,9 @@ while True:
             rss_search_url = rss_link+addon + expr.join(clean_keywords)
             # print(rss_search_url)
             my_parser = rss2title_bt(rss_search_url)
+            if my_parser is None:
+                print("failed to parse rss")
+                continue
             task_save_dir = os.path.join(location, rule_name)
             for title, content in my_parser.items():
                 url = content['url']

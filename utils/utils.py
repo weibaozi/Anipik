@@ -52,6 +52,7 @@ def download(url, location=None, stream=False,filename=None):
     try:
         response = requests.get(url, stream=stream,timeout=30)
     except:
+        print("file to download file from url:",url)
         return False
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
@@ -138,6 +139,10 @@ def rss2title_bt(rss_url) -> Dict[str, str]:
     if response is None:
         print("Failed to download the RSS file")
         return {}
+    # check if the response is xml
+    if not response.startswith(b'<?xml'):
+        print("The response is not a valid XML file")
+        return None
     #prase
     soup = BeautifulSoup(response, features="xml")
     # soup = BeautifulSoup(response.text, 'html.parser')
