@@ -41,7 +41,12 @@ def run_bot(TOKEN=TOKEN):
     async def test_notify():
         print("test")
         with open (notify_queue_dir,'r+',encoding='utf-8') as f:
-            notify_queue=yaml.load(f, Loader=yaml.FullLoader)
+            try:
+                notify_queue=yaml.load(f, Loader=yaml.FullLoader)
+            except yaml.reader.ReaderError:
+                notify_queue={'discord_user':{},'discord_channel':{}}
+                yaml.dump(notify_queue, f, allow_unicode=True)
+                notify_queue=yaml.load(f, Loader=yaml.FullLoader)
             if notify_queue is None:
                 return
             for user_id,messages in notify_queue['discord_user'].items():
