@@ -6,7 +6,13 @@ def notify_discord(message,setting,user_id=None,channel_id=None):
     """notify discord user or channel"""
     with open(NOTIFY_QUEUE_DIR, "r+",encoding='utf-8') as f:
         # print(NOTIFY_QUEUE_DIR)
-        notify_queue=yaml.load(f, Loader=yaml.FullLoader)
+        try:
+            notify_queue=yaml.load(f, Loader=yaml.FullLoader)
+        except yaml.reader.ReaderError:
+            notify_queue={'discord_user':{},'discord_channel':{}}
+            yaml.dump(notify_queue, f, allow_unicode=True)
+            notify_queue=yaml.load(f, Loader=yaml.FullLoader)
+
         # print(notify_queue)
         if notify_queue is None:
             notify_queue={'discord_user':{},'discord_channel':{}}
