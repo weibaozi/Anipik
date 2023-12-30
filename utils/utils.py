@@ -136,8 +136,13 @@ def parse_episode(episode_list: list):
 def rss2title_bt(rss_url) -> Dict[str, str]:
     # rss_url = "https://acg.rip/.xml"
     response = download(rss_url)
-    if response is None:
+    if response is None or type(response) is bool:
         print("Failed to download the RSS file")
+        for i in range(10):
+            time.sleep(2)
+            response = download(rss_url)
+            if response is not None and type(response) is not bool:
+                break
         return {}
     # check if the response is xml
     if not response.startswith(b'<?xml'):
