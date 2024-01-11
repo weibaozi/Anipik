@@ -7,7 +7,11 @@ from utils.utils import *
 import pandas as pd
 from pikpakapi import PikPakApi
 import asyncio
-    
+import copy
+
+def save_yaml(data,file):
+    yaml.dump(data, open(file, "w",encoding='utf-8'), allow_unicode=True)
+
 hide_streamlit_style = """
 <style>
 
@@ -58,28 +62,51 @@ if st.session_state.state == -1:
     main_container = st.container()
     main_container.write("Welcome to the app")
     main_container.write("This is the main page")
-    rss_name=st.text_input("Enter your rss name")
-    rss_link=st.text_input("Enter your rss link")
+    rss_option=st.selectbox("Select a rss to edit", list(anime_rss.keys()),index=None,placeholder="Select an rss profile to edit or create a new one")
+    if rss_option:
+        button_name='Edit'
+        rss_name=st.text_input("Enter your rss name",rss_option)
+        rss_link=st.text_input("Enter your rss link")
+    else:
+        button_name='Add'
+        rss_name=st.text_input("Enter your rss name")
+        rss_link=st.text_input("Enter your rss link")
     check=st.checkbox("Advanced options")
     rss_addon=None
     rss_expr=None
     if check:
-        rss_addon=st.text_input("Enter your rss addon for searching keywords",placeholder='e.g. ?keyword=')
-        rss_expr=st.text_input("Enter your rss regular express between keywords", placeholder='e.g. +')
-    if st.button("Add"):
-        # if rss_name not in anime_rss:
-            anime_rss[rss_name]={'rss_link':rss_link,'addon':rss_addon,'expr':rss_expr,'tasks':[]} #personal tasks goes under rss_link
-            with open(anime_rss_dir, "w",encoding='utf-8') as f:
-                yaml.dump(anime_rss, f,allow_unicode=True)
-            
+        if rss_option:
+            rss_addon=st.text_input("Enter your rss prefix for searching keywords",value=anime_rss[rss_option]['addon'],placeholder='e.g. https://share.dmhy.org/topics/rss/rss.xml?keyword=' if rss_option in anime_rss else '')
+            rss_suffix=st.text_input("Enter your rss suffix for searching keywords",value=anime_rss[rss_option]['suffix'],placeholder='' if rss_option in anime_rss else '')
+            rss_expr=st.text_input("Enter your rss regular express between keywords",value=anime_rss[rss_option]['expr'], placeholder='e.g. +' if rss_option in anime_rss else '')
+        else:
+            rss_addon=st.text_input("Enter your rss prefix for searching keywords",placeholder='e.g. https://share.dmhy.org/topics/rss/rss.xml?keyword=')
+            rss_suffix=st.text_input("Enter your rss suffix for searching keywords",placeholder='')
+            rss_expr=st.text_input("Enter your rss regular express between keywords", placeholder='e.g. +')
+    rss_col1, rss_col2 = st.columns([1,1])
+
+    if rss_col1.button(button_name):
+            anime_rss[rss_name]={'rss_link':rss_link,'addon':rss_addon,'suffix':rss_suffix,'expr':rss_expr,'tasks':{}} #personal tasks goes under rss_link
+            #pop old rss
+            if rss_option:
+                anime_rss[rss_name]["tasks"]=copy.deepcopy(anime_rss[rss_option]["tasks"])
+                anime_rss.pop(rss_option)
+        
+                
+            save_yaml(anime_rss,anime_rss_dir)
             rss_name=''
             rss_link=''
             st.rerun()
-            # st.success('This is a success message!', icon="✅")
+    if rss_option:
+        if rss_col2.button("Delete"):
+            anime_rss.pop(rss_option)
+            save_yaml(anime_rss,anime_rss_dir)
+
+            st.rerun()
     pp_col1, pp_col2 = st.columns([1,1])
     pikpak_username=pp_col1.text_input("Enter your pikpak username")
     pikpak_password=pp_col2.text_input("Enter your pikpak password",type="password")
-    ppbutton_col1, ppbutton_col2 = st.columns([3,1])
+    ppbutton_col1, ppbutton_col2 = st.columns([1,1])
     if ppbutton_col1.button("Try Login"):
         client = PikPakApi(
                     username=pikpak_username,
@@ -164,7 +191,7 @@ else:
     st.write(f"Current rss profile: {xml}")
     bt=rss2title_bt(xml)
     bt_pd=pd.DataFrame(bt).T
-    st.dataframe(bt_pd,width=1000)
+    st.dataframe(bt_pd,width=1000)  
 
 if st.sidebar.button("refresh"):
     st.session_state.state = 0
