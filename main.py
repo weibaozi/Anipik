@@ -106,6 +106,7 @@ while True:
         expr = content['expr']
         rss_link = content['rss_link']
         tasks = content['tasks']
+        suffix=content['suffix']
         # print(location,tasks)
         # break
         for _, task in tasks.items():
@@ -117,7 +118,7 @@ while True:
             keywords = task['keywords']
             # strip to get rid of the space at the beginning and end of the string
             clean_keywords = [keyword.strip() for keyword in keywords]
-            rss_search_url = rss_link+addon + expr.join(clean_keywords)
+            rss_search_url = addon + expr.join(clean_keywords) + suffix
             # print(rss_search_url)
             my_parser = rss2title_bt(rss_search_url)
             if my_parser is None:

@@ -66,7 +66,7 @@ if st.session_state.state == -1:
     if rss_option:
         button_name='Edit'
         rss_name=st.text_input("Enter your rss name",rss_option)
-        rss_link=st.text_input("Enter your rss link")
+        rss_link=st.text_input("Enter your rss link",anime_rss[rss_option]['rss_link'])
     else:
         button_name='Add'
         rss_name=st.text_input("Enter your rss name")
@@ -187,9 +187,9 @@ else:
                 yaml.dump(anime_rss, f,allow_unicode=True)
             st.rerun()
 
-    xml= params['rss_link']
-    st.write(f"Current rss profile: {xml}")
-    bt=rss2title_bt(xml)
+    xml_url= params['rss_link']
+    st.write(f"Current rss profile: {xml_url}")
+    bt=rss2title_bt(xml_url)
     bt_pd=pd.DataFrame(bt).T
     st.dataframe(bt_pd,width=1000)  
 
