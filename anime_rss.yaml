@@ -1,7 +1,8 @@
-动漫花园:
-  addon: ?keyword=
+MioBT:
+  addon: https://www.miobt.com/rss-
   expr: +
-  rss_link: https://share.dmhy.org/topics/rss/rss.xml
+  rss_link: https://www.miobt.com/rss.xml
+  suffix: .xml
   tasks:
     咒术回战:
       downloaded_episodes:
