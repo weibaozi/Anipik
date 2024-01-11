@@ -39,7 +39,7 @@ def run_bot(TOKEN=TOKEN):
 
     @tasks.loop(seconds=2)
     async def test_notify():
-        print("test")
+        # print("test")
         with open (notify_queue_dir,'r+',encoding='utf-8') as f:
             try:
                 notify_queue=yaml.load(f, Loader=yaml.FullLoader)

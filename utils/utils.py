@@ -9,22 +9,9 @@ import base64
 from bs4 import BeautifulSoup
 import yaml
 import time
-# def download(url, location=None, stream=False):
-#     response = requests.get(url, stream=stream)
-#     # Check if the request was successful (status code 200)
-#     if response.status_code == 200:
-#         # Get the file content
-#         if stream:
-#             file_content = response.raw
-#         else:
-#             file_content = response.content
-#         return file_content
 
-#     else:
-#         print(
-#             f"Failed to download the file. Status code: {response.status_code}")
-#         return False
-
+download_headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
 def has_file_extension(url):
     # Regular expression to match a file extension at the end of a URL
     # This regex looks for a period followed by a sequence of alphanumeric characters
@@ -33,7 +20,7 @@ def has_file_extension(url):
     
     return re.search(pattern, url) is not None
 
-def download(url, location=None, stream=False,filename=None):
+def download(url, location=None, stream=False,filename=None,headers=None):
     """
     Download a file from the given URL and save it to the current directory
 
@@ -50,7 +37,7 @@ def download(url, location=None, stream=False,filename=None):
     if not url.startswith('http'):
         url='http://'+url
     try:
-        response = requests.get(url, stream=stream,timeout=30)
+        response = requests.get(url, stream=stream,timeout=30,headers=headers)
     except:
         print("file to download file from url:",url)
         return False
@@ -135,7 +122,7 @@ def parse_episode(episode_list: list):
 
 def rss2title_bt(rss_url) -> Dict[str, str]:
     # rss_url = "https://acg.rip/.xml"
-    response = download(rss_url)
+    response = download(rss_url, headers=download_headers)
     if response is None or type(response) is bool:
         print("Failed to download the RSS file")
         for i in range(10):
@@ -143,6 +130,8 @@ def rss2title_bt(rss_url) -> Dict[str, str]:
             response = download(rss_url)
             if response is not None and type(response) is not bool:
                 break
+            else:
+                print("Failed to download, retrying...")
         return {}
     # check if the response is xml
     if not response.startswith(b'<?xml'):
