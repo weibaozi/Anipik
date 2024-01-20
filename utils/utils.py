@@ -80,7 +80,7 @@ def download(url, location=None, stream=False,filename=None,headers=None):
         return None
 def extract_episode_number(input_string):
     # Define a regular expression pattern to match the episode number
-    patterns = [r'\b(\d{2})\b',r'\b(\d+)\b']
+    patterns = [r'\b(\d{2})\b',r'E(\d{2})\b',r'\b(\d+)\b']
     for pattern in patterns:
         # Use re.search() to find the first match in the string
         match = re.findall(pattern, input_string)
