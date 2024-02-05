@@ -63,9 +63,15 @@ def download(url, location=None, stream=False,filename=None,headers=None):
                     pass
         # print(f"Saving file to {save_path}")
             if stream:
-                with open(save_path, 'wb') as file:
-                    for data in response.iter_content(chunk_size=4096):
-                        file.write(data)
+                try:
+                    with open(save_path, 'wb') as file:
+                        for data in response.iter_content(chunk_size=4096):
+                            file.write(data)
+                except Exception as e:
+                    print(e)
+                    #delete the file if failed to download
+                    os.remove(save_path)
+
             else:
                 with open(save_path, 'wb') as file:
                     file.write(response.content)
