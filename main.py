@@ -89,11 +89,14 @@ while True:
                 login = True
                 break
             except:
-                time.sleep(i*5)
-                if i == 4:
-                    print("login failed, please check your username and password")
-                    setting['pikpak_username'] = input("username:")
-                    setting['pikpak_password'] = input("password:")
+                #sleep one hour
+                time.sleep(3600)
+                break
+                # time.sleep(i*5)
+                # if i == 4:
+                #     print("login failed, please check your username and password")
+                #     setting['pikpak_username'] = input("username:")
+                #     setting['pikpak_password'] = input("password:")
 
     if 'location' not in setting:
         location = current_directory

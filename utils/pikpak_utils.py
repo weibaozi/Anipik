@@ -34,14 +34,14 @@ async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=N
                 print(e)
                 continue
         #iterate 5 times to check if the task has been completed
-        for i in range(5):
+        for i in range(10):
 
             failed_magnet_links=[] #store failed magnet links
             time.sleep(10+10*i)
             js=json.dumps(await client.offline_list(), indent=4)
             for magnet_link in magnet_links:
                 if magnet_link in js:
-                    print(f"task has not been completed for {magnet_link}")
+                    print(f"file id:{file_ids[magnet_link]} has not been completed for {magnet_link}")
                     #file_ids.pop(magnet_link)
                     failed_magnet_links.append(magnet_link)
 
@@ -61,6 +61,7 @@ async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=N
                 except Exception as e:
                     print(e)
                     continue
+            #if still task remaining
             if len(file_ids)==0:
                 break
             print("task has not been completed, retrying...")
