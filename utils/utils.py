@@ -142,23 +142,33 @@ def rss2title_bt(rss_url) -> Dict[str, str]:
                 print("Failed to download, retrying...")
         return {}
     # check if the response is xml
-    if not response.startswith(b'<?xml'):
+    pattern=re.compile(b'^<.*xml')
+    if not bool(pattern.match(response)):
         print("The response is not a valid XML file")
         return None
     #prase
+    # print(response)
     soup = BeautifulSoup(response, features="xml")
+    
+    # print(soup)
     # soup = BeautifulSoup(response.text, 'html.parser')
     anime_bt_urls={}
     for item in soup.find_all('item'):
             # print(item.title.text)
             bt=item.find(type="application/x-bittorrent")
+            link=item.link.text
+            date=item.pubDate.text
+            download_url=None
             if bt:
-                url=bt.get('url')
-                link=item.link.text
-                date=item.pubDate.text
-            
-            anime_bt_urls[item.title.text]={'url':url,'link':link,'date':date}
-    # print(anime_bt_urls)
+                download_url=bt.get('url')
+            #ccurent work for nyaa site
+            else:
+                try:
+                    download_url=item.link.text
+                except:
+                    print('no url found')
+            # print(download_url)
+            anime_bt_urls[item.title.text]={'url':download_url,'link':link,'date':date}
     return anime_bt_urls
 def send_wechat(message,setting,notify_queue_dir,wechat_id='ALL'):
     notify_queue=yaml.load(open(notify_queue_dir, "r",encoding='utf-8'), Loader=yaml.FullLoader)
