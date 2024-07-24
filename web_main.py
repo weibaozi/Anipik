@@ -46,7 +46,7 @@ setting=yaml.load(open(setting_dir, "r",encoding='utf-8'), Loader=yaml.FullLoade
 n_site=len(anime_rss)
 for i,(site, params) in enumerate(anime_rss.items()):
     if st.sidebar.button(f"{site}"):
-        st.session_state.state = 0
+        st.session_state.state = i
 
 #intial session
 if 'session_id' not in st.session_state:
@@ -151,41 +151,42 @@ else:
             st.rerun()
     # data_editor=st.data_editor({'A':{"n":1,"m":2},"B":{'n':3,'m':4}})
     #reorder
-    tasks_content= [rule_content for rule_name,rule_content in anime_rss[site]['tasks'].items()]
-    df=pd.DataFrame(tasks_content)
-    desired_column_order = ['rule_name','keywords'] + [col for col in df.columns if col not in  ['rule_name','keywords']]
-    df = df[desired_column_order]
-    st.data_editor(df)
+    if anime_rss[site]['tasks']:
+        tasks_content= [rule_content for rule_name,rule_content in anime_rss[site]['tasks'].items()]
+        df=pd.DataFrame(tasks_content)
+        desired_column_order = ['rule_name','keywords'] + [col for col in df.columns if col not in  ['rule_name','keywords']]
+        df = df[desired_column_order]
+        st.data_editor(df)
 
-    option = st.selectbox("Select a rule to edit", df['rule_name'])
-    if option:
-        current_rule_name=option
-        rule_name=st.text_input("Rule name",current_rule_name)
-        task_col1, task_col2 = st.columns([1,1])
-        current_keywords= ','.join(df[df['rule_name']==option]['keywords'].values[0])
-        current_episodes=','.join(map(str,df[df['rule_name']==option]['downloaded_episodes'].values[0]))
-        
-        
-        #space taker
-        keywords=task_col1.text_input("Keywords",current_keywords)
-        episodes=task_col2.text_input("downloaded_episodes",current_episodes)
-        if task_col1.button("Update"):
-            keyword_list=[keyword for keyword in keywords.split(',') if keyword!='']
-            episode_list=[episode for episode in episodes.split(',') if episode!='']
-            anime_rss[site]['tasks'][option]['keywords']=keyword_list
-            anime_rss[site]['tasks'][option]['downloaded_episodes']=parse_episode(episode_list)
-            if rule_name!=option:
-                anime_rss[site]['tasks'][option]['rule_name']=rule_name
-                anime_rss[site]['tasks'][rule_name]=anime_rss[site]['tasks'].pop(option)
-                rename_folder(option,rule_name,location=setting['location'])
-            with open(anime_rss_dir, "w",encoding='utf-8') as f:
-                yaml.dump(anime_rss, f,allow_unicode=True)
-            st.rerun()
-        if task_col2.button("Delete"):
-            anime_rss[site]['tasks'].pop(option)
-            with open(anime_rss_dir, "w",encoding='utf-8') as f:
-                yaml.dump(anime_rss, f,allow_unicode=True)
-            st.rerun()
+        option = st.selectbox("Select a rule to edit", df['rule_name'])
+        if option:
+            current_rule_name=option
+            rule_name=st.text_input("Rule name",current_rule_name)
+            task_col1, task_col2 = st.columns([1,1])
+            current_keywords= ','.join(df[df['rule_name']==option]['keywords'].values[0])
+            current_episodes=','.join(map(str,df[df['rule_name']==option]['downloaded_episodes'].values[0]))
+            
+            
+            #space taker
+            keywords=task_col1.text_input("Keywords",current_keywords)
+            episodes=task_col2.text_input("downloaded_episodes",current_episodes)
+            if task_col1.button("Update"):
+                keyword_list=[keyword for keyword in keywords.split(',') if keyword!='']
+                episode_list=[episode for episode in episodes.split(',') if episode!='']
+                anime_rss[site]['tasks'][option]['keywords']=keyword_list
+                anime_rss[site]['tasks'][option]['downloaded_episodes']=parse_episode(episode_list)
+                if rule_name!=option:
+                    anime_rss[site]['tasks'][option]['rule_name']=rule_name
+                    anime_rss[site]['tasks'][rule_name]=anime_rss[site]['tasks'].pop(option)
+                    rename_folder(option,rule_name,location=setting['location'])
+                with open(anime_rss_dir, "w",encoding='utf-8') as f:
+                    yaml.dump(anime_rss, f,allow_unicode=True)
+                st.rerun()
+            if task_col2.button("Delete"):
+                anime_rss[site]['tasks'].pop(option)
+                with open(anime_rss_dir, "w",encoding='utf-8') as f:
+                    yaml.dump(anime_rss, f,allow_unicode=True)
+                st.rerun()
 
     xml_url= params['rss_link']
     st.write(f"Current rss profile: {xml_url}")

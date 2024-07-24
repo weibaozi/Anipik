@@ -157,10 +157,21 @@ while True:
                 temp_episodes.append(int(episode_number))
 
     # print(anime_rss)
-    for thread in download_queue:
-        thread.start()
-    for thread in download_queue:
-        thread.join()
+    #start 3 threads at a time
+    for i in range(0, len(download_queue), 3):  # Step through the list in steps of 3
+        threads = []
+        for thread in download_queue[i:i+3]:  # Create threads for the next three tasks
+            threads.append(thread)
+            thread.start()
+        
+        # Wait for all three threads to complete before moving to the next batch
+        for thread in threads:
+            thread.join()
+
+    # for thread in download_queue:
+    #     thread.start()
+    # for thread in download_queue:
+    #     thread.join()
     yaml.dump(anime_rss, open(anime_rss_dir, "w",
               encoding='utf-8'), allow_unicode=True)
     # print("all tasks completed")
