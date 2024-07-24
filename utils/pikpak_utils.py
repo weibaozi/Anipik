@@ -10,7 +10,7 @@ async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=N
             username="",
             password="",
         ) 
-    await client.login()
+        await client.login()
     # print(json.dumps(client.get_user_info(), indent=4))
     print("=" * 30, end="\n\n")
     file_ids={}

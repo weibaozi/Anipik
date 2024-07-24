@@ -82,7 +82,7 @@ def download(url, location=None, stream=False,filename=None,headers=None):
 
         
     else:
-        # print(f"Failed to download the file. Status code: {response.status_code}")
+        print(f"Failed to download the file. Status code: {response.status_code}")
         return None
 def extract_episode_number(input_string):
     # Define a regular expression pattern to match the episode number
