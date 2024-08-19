@@ -3,8 +3,14 @@ MioBT:
   expr: +
   rss_link: https://www.miobt.com/rss.xml
   suffix: .xml
+  tasks: {}
+末日动漫:
+  addon: https://share.acgnx.se/rss.xml?keyword=
+  expr: +
+  rss_link: https://share.acgnx.se/rss.xml
+  suffix: ''
   tasks:
-    咒术回战:
+    我推的孩子:
       downloaded_episodes:
       - 1
       - 2
@@ -23,34 +29,8 @@ MioBT:
       - 15
       - 16
       - 17
-      - 18
-      - 19
-      - 20
-      - 21
-      - 22
-      - 23
-      - 24
-      - 25
-      - 26
-      - 27
-      - 28
-      - 29
-      - 30
-      - 31
-      - 32
-      - 33
-      - 34
-      - 35
-      - 36
-      - 37
-      - 38
-      - 39
-      - 40
-      - 41
-      - 42
       enable: true
       keywords:
-      - ani
-      - ' juju'
-      rule_name: 咒术回战
+      - ani 我推的孩子
+      rule_name: 我推的孩子
       update time: null
