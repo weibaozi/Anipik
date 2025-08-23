@@ -104,6 +104,7 @@ def is_magnet(url):
 def torrent_to_magnet(torrent_url):
     torrent=download(torrent_url)
     # 解码种子文件
+    # print(torrent)
     torrent = bencodepy.decode(torrent)
 
     # 提取info字段并计算其SHA1哈希
@@ -216,14 +217,16 @@ def rename_folder(old,new,location=''):
         print('rename fail',e)
 
 if __name__ == "__main__":
-    print("Testing download function...")
-    url='https://acg.rip/t/292293.torrent'
-    download(url,location='./')
-    print("Testing extract_episode_number function...")
-    input_string = "【幻月字幕组】【23年日剧】【呛人姐与心机妹】【07】【1080P】【中日双语】 "
-    episode_number = extract_episode_number(input_string)
-    print(episode_number)
-    print("Testing is_magnet function...")
-    print(is_magnet('magnet:?xt=urn:btih:cdd228527015a84768e8a4f6e47469b3f29b9e8c&tr=http://open.acgtracker.com:1096/announce'))
-    print("Testing torrent_to_magnet function...")
-    print(torrent_to_magnet('https://acg.rip/t/292293.torrent'))
+    # print("Testing download function...")
+    # url='https://acg.rip/t/292293.torrent'
+    # download(url,location='./')
+    # print("Testing extract_episode_number function...")
+    # input_string = "【幻月字幕组】【23年日剧】【呛人姐与心机妹】【07】【1080P】【中日双语】 "
+    # episode_number = extract_episode_number(input_string)
+    # print(episode_number)
+    # print("Testing is_magnet function...")
+    # print(is_magnet('magnet:?xt=urn:btih:cdd228527015a84768e8a4f6e47469b3f29b9e8c&tr=http://open.acgtracker.com:1096/announce'))
+    # print("Testing torrent_to_magnet function...")
+    # print(torrent_to_magnet('https://acg.rip/t/292293.torrent'))
+    link="http://v2.uploadbt.com/?r=down&hash=7a02de270926eafe1ac8b11c2cb4c448786d879c"
+    print(torrent_to_magnet(link))

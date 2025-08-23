@@ -1,7 +1,7 @@
 import yaml
 import os
 # from utils import *
-from utils.pikpak_utils import magnet_to_download_url
+from utils.pikpak_utils import magnet_to_download_url,magnet_to_file_ids
 from utils.utils import *
 from pikpakapi import PikPakApi
 import json
@@ -29,24 +29,86 @@ notify_queue_dir = os.path.join(
 #     pass
 
 # print(message_queue)
+intervals = [60, 600, 3600, 7200, 10800]
 
-
-def download_helper(download_url, download_episodes, episode_number, location=current_directory, stream=False):
-    if download(download_url[1], location=location, filename=download_url[0], stream=stream):
-        print(f"successfully download {download_url[0]}")
+def download_helper(url,name, download_episodes, episode_number, location=current_directory, stream=False):
+    # url = download_url[1]
+    # name = download_url[0]
+    print(f"Downloading {name}...")
+    if download(url, location=location, filename=name, stream=stream):
+        print(f"successfully download {name}")
         setting = yaml.load(
             open(setting_dir, "r", encoding='utf-8'), Loader=yaml.FullLoader)
         if setting['discord'] == True:
             notify_discord(
-                f"完成下载: {download_url[0]}", setting)
+                f"完成下载: {name}", setting)
         with lock:
             download_episodes.append(episode_number)
     else:
-        print(f"failed to download {download_url[0]}")
+        print(f"failed to download {name}")
         #temperory solution, will fix later
         with lock:
             download_episodes.append(episode_number)
-
+async def download_helper_id(download_queue_ids, stream=False,client=None):
+    for download_id, (download_episodes, episode_number, location) in download_queue_ids.items():
+        
+        js=json.dumps(
+                        await client.get_download_url(download_id), indent=4
+                            )
+                        #parse js
+        js=json.loads(js)
+        url = js['web_content_link']
+        name = js['name']
+        print(f"Downloading {name}...")
+        if download(url, location=location, filename=name, stream=stream):
+            print(f"successfully download {name}")
+            setting = yaml.load(
+                open(setting_dir, "r", encoding='utf-8'), Loader=yaml.FullLoader)
+            if setting['discord'] == True:
+                notify_discord(
+                    f"完成下载: {name}", setting)
+            with lock:
+                download_episodes.append(episode_number)
+        else:
+            print(f"failed to download {name}")
+            #temperory solution, will fix later
+            with lock:
+                download_episodes.append(episode_number)
+async def download_helper_id_to_tasks(download_queue_ids, stream=False,client=None):
+    threads=[]
+    for download_id, (download_episodes, episode_number, location) in download_queue_ids.items():
+        for i, delay in enumerate(intervals, start=1):
+            js = json.dumps(await client.offline_list(), indent=4)
+            if download_id in js:
+                print(f"[{i}/5] file id:{download_id} has not been completed")
+                if i < len(intervals):  # don’t sleep after last attempt
+                    if delay >= 60:
+                        total = delay // 60   # minutes
+                        unit = "min"
+                        print(f"Sleeping for {total} {unit}...")
+                        for _ in tqdm(range(total), desc="Waiting", unit=unit):
+                            await asyncio.sleep(60)
+                    else:
+                        total = delay         # seconds
+                        unit = "s"
+                        print(f"Sleeping for {total} {unit}...")
+                        for _ in tqdm(range(total), desc="Waiting", unit=unit):
+                            await asyncio.sleep(1)
+                continue
+            else:
+                print(f"[{i}/5] file id:{download_id} is completed ✅")
+                break
+        else:
+            print(f"file id:{download_id} not completed after all retries ❌")
+            continue
+        
+        js = json.dumps(await client.get_download_url(download_id), indent=4)
+        js=json.loads(js)
+        url = js['web_content_link']
+        name = js['name']
+        thread = threading.Thread(target=download_helper, args=(url, name, download_episodes, episode_number, location, stream))
+        threads.append(thread)
+    return threads
 async def main():
 
     login = False
@@ -83,28 +145,33 @@ async def main():
             client = PikPakApi(
                 username=setting['pikpak_username'],
                 password=setting['pikpak_password'],
+                # device_id="GJK-Ry9p"
             )
             # try login 5 times
             for i in range(5):
                 try:
                     print("logging in... Current time:", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))) 
                     await client.login()
-                    print("test")
+                    await client.refresh_access_token()
+                    # print("test")
                     yaml.dump(setting, open(setting_dir, "w",
                                             encoding='utf-8'), allow_unicode=True)
                     login = True
                     break
-                except:
+                except Exception as e: 
+                    print(e)
                     print("login failed, retrying...")
                     #sleep one hour
-                    time.sleep(3600)
-                    break
+                    for _ in tqdm(range(125), desc="Timer (2 hour)", unit="min"):
+                        # time.sleep(1)
+                        await asyncio.sleep(60)
         print("login success")
         if 'location' not in setting:
             location = current_directory
         else:
             location = setting['location']
         download_queue = []
+        download_queue_ids = {}
         # checking tasks
         for rss_name, content in anime_rss.items():
             addon = content['addon']
@@ -146,30 +213,37 @@ async def main():
                             print('error download url', title)
                             continue
                     print(rule_name, episode_number)
-                    download_url = await magnet_to_download_url(client=client, magnet_links=[url])
-                    # download_url = asyncio.run(magnet_to_download_url(
-                    #     client=client, magnet_links=[url]))
-                    if len(download_url) == 0:
+                    try:
+                        file_ids = await magnet_to_file_ids(client=client, magnet_links=[url])
+                        # print(file_ids)
+
+                    except Exception as e:
+                        print(e)
+                        print("error download url", title)
+                        # await client.refresh_access_token()
+
+                    if url not in file_ids.keys():
                         print('error download url', title)
                         continue
                     # print(download_url)
-                    download_url = download_url[0]
-                    thread = threading.Thread(target=download_helper, args=(
-                        download_url, downloaded_episodes, episode_number, task_save_dir, True))
-                    # task = asyncio.create_task(download_helper(download_url, downloaded_episodes, episode_number, task_save_dir, True))
-                    download_queue.append(thread)
+                    file_id = file_ids[url]
+                    download_queue_ids[file_id] = (downloaded_episodes, episode_number, task_save_dir)
+                    # thread = threading.Thread(target=download_helper, args=(
+
                     temp_episodes.append(int(episode_number))
 
-        # print(anime_rss)
-        #start 3 threads at a time
-        for i in range(0, len(download_queue), 3):  # Step through the list in steps of 3
-            threads = []
-            for thread in download_queue[i:i+3]:  # Create threads for the next three tasks
-                threads.append(thread)
+        # await download_helper_id(download_queue_ids, stream=True, client=client)
+        threads = await download_helper_id_to_tasks(download_queue_ids, stream=True, client=client)
+        #start max threads at a time
+        max_threads = 5
+        for i in range(0, len(threads), max_threads):  # Step through the list in steps of max_threads
+            cur_threads = []
+            for thread in threads[i:i+max_threads]:  # Create threads for the next max_threads tasks
+                cur_threads.append(thread)
                 thread.start()
             
             # Wait for all three threads to complete before moving to the next batch
-            for thread in threads:
+            for thread in cur_threads:
                 thread.join()
 
         # for thread in download_queue:

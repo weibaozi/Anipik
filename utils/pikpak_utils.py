@@ -3,7 +3,7 @@ from pikpakapi import PikPakApi
 import asyncio
 from typing import  Dict, List
 import time
-
+#deprecated
 async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=None)-> Dict[str, str]:
     if client is None:
         client = PikPakApi(
@@ -67,10 +67,52 @@ async def magnet_to_download_url(magnet_links:List[str]=None,client: PikPakApi=N
             print("task has not been completed, retrying...")
     return download_urls
 
+async def magnet_to_file_ids(magnet_links:List[str]=None,client: PikPakApi=None)-> Dict[str, str]:
+    if client is None:
+        client = PikPakApi(
+            username="",
+            password="",
+        )
+        await client.login()
+    # print(json.dumps(client.get_user_info(), indent=4))
+    print("=" * 30, end="\n\n")
+    file_ids = {}
+    download_ids = []
+    # offline_download
+    if magnet_links is not None:
+        for magnet_link in magnet_links:
+            try:
+                info = json.dumps(
+                    await client.offline_download(
+                        magnet_link
+                    ),
+                    indent=4,
+                )
+                info = json.loads(info)
+                file_id = info['task']['file_id']
+                file_ids[magnet_link] = file_id
+                #print(file_id)
+                #print("=" * 30, end="\n\n")
+            except Exception as e:
+                print(e)
+                continue
+        #iterate 5 times to check if the task has been completed
+    return file_ids
 
 if __name__ == "__main__":
     urls=['magnet:?xt=urn:btih:cdd228527015a84768e8a4f6e47469b3f29b9e8c&tr=http://open.acgtracker.com:1096/announce',
 'magnet:?xt=urn:btih:088ae9511c254dae7fdc310f2396930611861e1c&tr=http://open.acgtracker.com:1096/announce',
 'magnet:?xt=urn:btih:30bc227ed8d609336d49a0eae6b65a39b82ec775&tr=http://open.acgtracker.com:1096/announce']
-    download_urls=asyncio.run(magnet_to_download_url(magnet_links=urls))
-    print(download_urls)
+    urls=['magnet:?xt=urn:btih:5KRX7IPMOWOC44JSDA5W3MUIEAADSQ6R']
+    client = PikPakApi(
+        username="",
+        password="",
+    )
+    async def main():
+        await client.login()
+        links=await magnet_to_download_url(magnet_links=urls,client=client)
+        return links
+        
+    # download_urls=asyncio.run(magnet_to_download_url(magnet_links=urls))
+    links=asyncio.run(main())
+    print(links)
