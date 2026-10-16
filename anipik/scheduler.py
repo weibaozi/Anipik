@@ -257,11 +257,14 @@ class Scheduler:
 
     def _do_scan(self, sync):
         self.status["scanning"] = True
+        started = time.time()
+        log.info("scan started")
         try:
             if sync:
                 sync()
             queued = self.scan()
             self.status.update(last_scan_queued=len(queued), last_scan_error=None)
+            log.info("scan finished in %.1fs: %d new episode(s) queued", time.time() - started, len(queued))
         except Exception as exc:
             log.exception("scan failed")
             self.status["last_scan_error"] = f"{type(exc).__name__}: {exc}"
