@@ -74,11 +74,13 @@ def test_full_flow(env, tmp_path):
     status = tick()
     assert state["phase"] == "cloud_waiting" and bridge.submissions == [MAGNET]
     assert any(c["phase"] == "cloud_submitting" for c in checkpoints)  # checkpoint before the mutation
-    assert status.state == "running" and status.message == "cloud 30%"
+    assert (status.state, status.progress, status.message) == ("running", 30, "云端下载 30%")
 
     bridge.cloud["t0"].update(phase="PHASE_TYPE_COMPLETE", file_id="root", progress=100)
     tick()
     assert state["phase"] == "local_waiting" and len(bridge.local) == 2
+    status = tick()  # progress is the local stage's own percentage: 2 of 6 bytes, not 50 + x/2
+    assert status.progress == pytest.approx(33.33) and status.message.startswith("本地下载 33%")
     assert (tmp_path / "Show" / "Subs").is_dir()
 
     for task in bridge.local:

@@ -84,18 +84,20 @@ class PikPakClientDownloader(Downloader):
 
     @staticmethod
     def _status(state):
+        # progress is the current stage's own percentage (state["phase"] says which stage):
+        # the cloud stage is often instant (cached), so a combined 0-50/50-100 bar was misleading.
         phase = state.get("phase", "new")
         if phase == "done":
-            return Status("done", 100.0, "completed")
+            return Status("done", 100.0, "下载完成")
         if phase == "failed":
             return Status("failed", 0.0, state.get("error", "failed"))
         if phase in ("new", "cloud_submitting", "cloud_waiting"):
             cloud = float(state.get("cloud_progress") or 0)
-            return Status("running", cloud / 2, f"cloud {cloud:.0f}%")
+            return Status("running", cloud, f"云端下载 {cloud:.0f}%")
         local = float(state.get("local_progress") or 0)
-        message = (f"local {state.get('local_completed', 0)}/{state.get('local_total', 0)} files "
-                   f"{local:.0f}% {state.get('wait_reason') or ''}").strip()
-        return Status("running", 50 + local / 2, message)
+        message = (f"本地下载 {local:.0f}%（{state.get('local_completed', 0)}/{state.get('local_total', 0)} 个文件）"
+                   f" {state.get('wait_reason') or ''}").strip()
+        return Status("running", local, message)
 
     def _advance(self, job, state, checkpoint):
         bridge = self.bridge

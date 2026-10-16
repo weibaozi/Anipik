@@ -14,11 +14,11 @@ DEFAULT_SETTINGS = {
     "downloader": "pikpak_client",
     "downloader.pikpak_client": {"port": 19223},
     "scan_interval": 600,
-    "poll_interval": 15,
+    "poll_interval": 5,
     "max_active_jobs": 5,
     "max_attempts": 3,
     # A job that keeps failing to reach the downloader is parked after this many ticks.
-    "max_transient_errors": 40,
+    "max_transient_errors": 120,
     "notify.discord.enabled": False,
     "notify.discord.ids": {"user_id": [], "channel_id": []},
 }

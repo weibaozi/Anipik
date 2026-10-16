@@ -138,7 +138,6 @@ const historyColumns = computed<DataTableColumns<Job>>(() => [
               <div class="meta">
                 <span>{{ job.message || (job.phase === 'pending' ? '等待空闲下载位' : '') }}</span>
                 <span v-if="job.speed">{{ formatSpeed(job.speed) }}</span>
-                <span v-if="job.files_total">文件 {{ job.files_done }}/{{ job.files_total }}</span>
                 <span class="mono">{{ job.destination }}</span>
               </div>
               <n-alert v-if="job.error" type="warning" :show-icon="false" class="err">{{ job.error }}</n-alert>
