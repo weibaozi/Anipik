@@ -1,0 +1,24 @@
+import os
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.environ.get("ANIPIK_DATA", ROOT / "data"))
+DB_PATH = Path(os.environ.get("ANIPIK_DB", DATA_DIR / "anipik.db"))
+
+LEGACY_RSS = ROOT / "anime_rss.yaml"
+LEGACY_SETTING = ROOT / "setting.yaml"
+
+# Defaults for keys in the settings table; the table overrides them.
+DEFAULT_SETTINGS = {
+    "library_root": str(ROOT / "downloads"),
+    "downloader": "pikpak_client",
+    "downloader.pikpak_client": {"port": 19223},
+    "scan_interval": 600,
+    "poll_interval": 15,
+    "max_active_jobs": 5,
+    "max_attempts": 3,
+    # A job that keeps failing to reach the downloader is parked after this many ticks.
+    "max_transient_errors": 40,
+    "notify.discord.enabled": False,
+    "notify.discord.ids": {"user_id": [], "channel_id": []},
+}

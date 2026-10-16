@@ -13,3 +13,6 @@ Requests==2.31.0
 streamlit==1.28.2
 tqdm==4.64.0
 tqdm==4.64.1
+SQLAlchemy>=2.0
+websocket-client>=0.58
+pytest
