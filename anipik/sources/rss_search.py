@@ -34,6 +34,7 @@ def parse_feed(content: bytes) -> list[Release]:
 
 class RssSearchSource(SourceKind):
     kind = "rss_search"
+    fields = ("search_prefix", "keyword_sep", "search_suffix")
 
     def search_url(self, params):
         keywords = [k.strip() for k in params.get("keywords") or [] if k and k.strip()]

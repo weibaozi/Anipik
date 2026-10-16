@@ -42,6 +42,13 @@ class Subscription(Base):
     enabled: Mapped[bool] = mapped_column(default=True)
     # Relative to library_root unless absolute; defaults to name.
     save_dir: Mapped[Optional[str]] = mapped_column(String)
+    # Metadata from bgm.tv (all optional; columns added after the first release must stay nullable).
+    bangumi_id: Mapped[Optional[int]]
+    original_name: Mapped[Optional[str]] = mapped_column(String)
+    cover_url: Mapped[Optional[str]] = mapped_column(String)
+    air_date: Mapped[Optional[str]] = mapped_column(String)
+    total_episodes: Mapped[Optional[int]]
+    summary: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=now)
     updated_at: Mapped[datetime] = mapped_column(default=now, onupdate=now)
 

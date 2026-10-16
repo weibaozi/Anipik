@@ -35,9 +35,9 @@ class Http:
         raise SourceError(f"GET {url} failed: {error}")
 
 
-def build_source(source, http) -> SourceKind:
+def build_source(kind, config, http) -> SourceKind:
     try:
-        cls = SOURCE_KINDS[source.kind]
+        cls = SOURCE_KINDS[kind]
     except KeyError:
-        raise SourceError(f"unknown source kind {source.kind!r}") from None
-    return cls(source.config, http)
+        raise SourceError(f"unknown source kind {kind!r}") from None
+    return cls(config, http)

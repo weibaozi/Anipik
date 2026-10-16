@@ -18,6 +18,7 @@ class Release:
 class SourceKind:
     """A kind of source. Instances come from Source.config; search() gets SourceBinding.params."""
     kind = ""
+    fields = ()  # config keys, for the web UI's source form
 
     def __init__(self, config: dict, http):
         self.config = config or {}

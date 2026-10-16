@@ -139,3 +139,12 @@ def test_backend_down_does_not_count_against_jobs(setup, factory):
     with session_scope(factory) as s:
         job = s.scalar(select(Job))
         assert (job.phase, job.transient_errors) == ("done", 0)
+
+
+def test_destination_for_subfolders_and_absolute():
+    from types import SimpleNamespace as NS
+    from anipik.scheduler import destination_for
+    assert destination_for(r"N:\新番", NS(save_dir="26年10月/Show: S2?", name="x")) == r"N:\新番\26年10月\Show_ S2_"
+    assert destination_for(r"N:\新番", NS(save_dir="../../escape", name="x")) == r"N:\新番\escape"
+    assert destination_for(r"N:\新番", NS(save_dir=None, name="Show")) == r"N:\新番\Show"
+    assert destination_for(r"N:\新番", NS(save_dir="D:/Other/Show", name="x")) == r"D:\Other\Show"

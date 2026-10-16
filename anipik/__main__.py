@@ -2,7 +2,8 @@
 
   migrate            import anime_rss.yaml + setting.yaml into data/anipik.db (re-runnable)
   scan [--dry-run]   search sources now and queue new episodes
-  run                scheduler loop (scan every scan_interval, poll every poll_interval)
+  serve              web UI + API on http://127.0.0.1:8964, with the scheduler in-process
+  run                scheduler loop only (scan every scan_interval, poll every poll_interval)
   status             subscriptions, active and attention-needing jobs
   probe              check the downloader backend (read-only)
   retry JOB          resume a needs_attention/failed job (--from-scratch resets its state)
@@ -18,6 +19,7 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 
 from sqlalchemy import func, select
 
@@ -92,6 +94,26 @@ def cmd_run(factory, args):
             Scheduler(factory).run(once=args.once, sync=sync)
         except KeyboardInterrupt:
             print("Stopped. Downloads already handed to the backend continue; rerun to resume.")
+
+
+def cmd_serve(factory, args):
+    import uvicorn
+
+    from .api import create_app
+
+    sync = None
+    if args.sync_yaml:
+        def sync():
+            with session_scope(factory) as session:
+                migrate(session, config.LEGACY_RSS, config.LEGACY_SETTING)
+    with single_instance(lock_path()) as acquired:
+        run_scheduler = acquired and not args.no_scheduler
+        if not acquired and not args.no_scheduler:
+            print("Another scheduler holds the lock; serving the UI only (scans are handed to it).")
+        app = create_app(factory, Scheduler(factory), run_scheduler=run_scheduler, sync=sync)
+        if args.host not in ("127.0.0.1", "localhost", "::1"):
+            print(f"WARNING: the API has no authentication and is reachable on {args.host}")
+        uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 
 def cmd_status(factory, args):
@@ -213,6 +235,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="python -m anipik", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--db", help=f"database file (default {config.DB_PATH}; env ANIPIK_DB)")
     commands = parser.add_subparsers(dest="command", required=True)
     p = commands.add_parser("migrate")
     p.add_argument("--rss", default=config.LEGACY_RSS)
@@ -223,6 +246,11 @@ def main(argv=None):
     p.add_argument("--once", action="store_true", help="one scan + one poll, then exit")
     p.add_argument("--sync-yaml", action="store_true",
                    help="re-import anime_rss.yaml before each scan (while streamlit is still the editor)")
+    p = commands.add_parser("serve")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8964)
+    p.add_argument("--no-scheduler", action="store_true", help="UI/API only; a separate `run` does the work")
+    p.add_argument("--sync-yaml", action="store_true", help="re-import anime_rss.yaml before each scan")
     commands.add_parser("status")
     p = commands.add_parser("probe")
     p.add_argument("--downloader")
@@ -258,6 +286,8 @@ def main(argv=None):
             stream.reconfigure(encoding="utf-8")
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if args.db:
+        config.DB_PATH = Path(args.db).resolve()
     factory = make_session_factory(config.DB_PATH)
     globals()[f"cmd_{args.command.replace('-', '_')}"](factory, args)
 
