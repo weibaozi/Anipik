@@ -6,6 +6,8 @@
   status             subscriptions, active and attention-needing jobs
   probe              check the downloader backend (read-only)
   retry JOB          resume a needs_attention/failed job (--from-scratch resets its state)
+  add-source NAME    add an rss_search source (--prefix, --sep, --suffix)
+  subscribe NAME     add an anime bound to a source (--source, --keywords, --include, --exclude)
   mark SUB EP...     set episodes done/skipped by hand, or forget them (--status delete)
   set KEY VALUE      change a setting (VALUE parsed as JSON when possible)
   settings           show effective settings
@@ -23,7 +25,7 @@ from . import config
 from .db import all_settings, make_session_factory, session_scope, set_setting
 from .downloaders import build_downloader
 from .migrate import migrate
-from .models import Episode, Job, Subscription
+from .models import Episode, Job, Source, SourceBinding, Subscription
 from .scheduler import Scheduler
 
 
@@ -138,6 +140,39 @@ def cmd_retry(factory, args):
         print(f"Job {job.id} -> running ({'from scratch' if args.from_scratch else 'resuming ' + str(job.state.get('phase'))})")
 
 
+def cmd_add_source(factory, args):
+    with session_scope(factory) as session:
+        source = session.scalar(select(Source).where(Source.name == args.name))
+        config_ = {"search_prefix": args.prefix, "keyword_sep": args.sep, "search_suffix": args.suffix}
+        if source is None:
+            session.add(Source(name=args.name, kind="rss_search", config=config_))
+        else:
+            source.config = config_
+    print(f"source {args.name}: {args.prefix}<keywords joined by {args.sep!r}>{args.suffix}")
+
+
+def cmd_subscribe(factory, args):
+    with session_scope(factory) as session:
+        source = session.scalar(select(Source).where(Source.name == args.source))
+        if source is None:
+            names = ", ".join(session.scalars(select(Source.name))) or "none (use add-source)"
+            sys.exit(f"No source {args.source!r}; available: {names}")
+        sub = session.scalar(select(Subscription).where(Subscription.name == args.name))
+        if sub is None:
+            sub = Subscription(name=args.name, save_dir=args.save_dir or args.name)
+            session.add(sub)
+            session.flush()
+        elif args.save_dir:
+            sub.save_dir = args.save_dir
+        params = {"keywords": args.keywords, "include": args.include or [], "exclude": args.exclude or []}
+        binding = next((b for b in sub.bindings if b.source_id == source.id), None)
+        if binding is None:
+            sub.bindings.append(SourceBinding(source=source, priority=len(sub.bindings), params=params))
+        else:
+            binding.params, binding.enabled = params, True
+    print(f"{args.name} <- {args.source} {json.dumps(params, ensure_ascii=False)}")
+
+
 def cmd_mark(factory, args):
     with session_scope(factory) as session:
         sub = session.scalar(select(Subscription).where(Subscription.name == args.subscription))
@@ -195,6 +230,18 @@ def main(argv=None):
     p.add_argument("job", type=int)
     p.add_argument("--from-scratch", action="store_true",
                    help="forget the job's checkpoint (only after checking the backend for duplicates)")
+    p = commands.add_parser("add-source", help="add/update an rss_search source")
+    p.add_argument("name")
+    p.add_argument("--prefix", required=True, help="e.g. https://share.dmhy.org/topics/rss/rss.xml?keyword=")
+    p.add_argument("--sep", default="+")
+    p.add_argument("--suffix", default="")
+    p = commands.add_parser("subscribe", help="add an anime, or (re)bind it to a source")
+    p.add_argument("name")
+    p.add_argument("--source", required=True)
+    p.add_argument("--keywords", nargs="+", required=True)
+    p.add_argument("--include", nargs="+", help="regexes every title must match")
+    p.add_argument("--exclude", nargs="+", help="regexes no title may match")
+    p.add_argument("--save-dir", help="relative to library_root (default: name) or absolute")
     p = commands.add_parser("mark", help="set episode status by hand")
     p.add_argument("subscription")
     p.add_argument("episodes", type=int, nargs="+")
@@ -212,7 +259,7 @@ def main(argv=None):
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     factory = make_session_factory(config.DB_PATH)
-    globals()[f"cmd_{args.command}"](factory, args)
+    globals()[f"cmd_{args.command.replace('-', '_')}"](factory, args)
 
 
 if __name__ == "__main__":

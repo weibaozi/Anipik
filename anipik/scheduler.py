@@ -173,6 +173,8 @@ class Scheduler:
             return
         job.state = copy.deepcopy(state)
         job.transient_errors, job.error = 0, None
+        if status.message != job.message:
+            log.info("job %s: %s (%.0f%%)", job.id, status.message, status.progress)
         job.progress, job.message = status.progress, status.message
         if status.state == "done":
             self._finish(job, "done", None, settings)

@@ -16,8 +16,10 @@ from .bridge import BridgeError, PikPakBridge
 
 
 def expected_path(destination, file):
-    root = Path(destination).resolve()
-    result = root.joinpath(*(p["name"] for p in file["parents"]), file["name"]).resolve()
+    # abspath, not resolve(): resolve() turns a mapped drive (N:\) into its UNC path,
+    # which then never matches the path the client reports.
+    root = Path(os.path.abspath(destination))
+    result = Path(os.path.abspath(root.joinpath(*(p["name"] for p in file["parents"]), file["name"])))
     if not result.is_relative_to(root):
         raise NeedsAttention("File path escapes destination")
     return result

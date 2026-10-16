@@ -134,6 +134,14 @@ def test_cloud_failure_and_overwrite_protection(env, tmp_path):
         tick()
 
 
+def test_expected_path_keeps_drive_letter():
+    from anipik.downloaders.pikpak_client.downloader import expected_path
+    path = expected_path("N:/新番/Show", {"name": "ep.mp4", "parents": [{"name": "Sub"}]})
+    assert str(path) == r"N:\新番\Show\Sub\ep.mp4"  # not \\server\share\... for mapped drives
+    with pytest.raises(NeedsAttention):
+        expected_path("N:/新番/Show", {"name": "x", "parents": [{"name": ".."}, {"name": ".."}]})
+
+
 def test_unreachable_client_is_transient():
     class Down(FakeBridge):
         def connect(self):
