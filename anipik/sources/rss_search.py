@@ -2,6 +2,7 @@
 
 Works for dmhy / MioBT / acg.rip / acgnx / nyaa style feeds.
 """
+import html
 import re
 
 from bs4 import BeautifulSoup
@@ -18,7 +19,8 @@ def parse_feed(content: bytes) -> list[Release]:
     soup = BeautifulSoup(content, features="xml")
     releases = []
     for item in soup.find_all("item"):
-        title = item.title.text.strip() if item.title else ""
+        # Some feeds (acgnx, MioBT) escape titles twice: "&amp;amp;" arrives as "&amp;".
+        title = html.unescape(item.title.text).strip() if item.title else ""
         link = item.link.text.strip() if item.link else None
         enclosure = item.find("enclosure")
         url = enclosure.get("url") if enclosure is not None and enclosure.get("url") else link

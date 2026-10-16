@@ -58,7 +58,7 @@ FEED = b"""<?xml version="1.0" encoding="UTF-8"?>
   <nyaa:infoHash>EAA37FA1EC759C2E7132183B6DB28820003943D1</nyaa:infoHash></item>
 <item><title>[B] Show - 01 [1080p]</title><link>https://site/view/1</link>
   <enclosure url="magnet:?xt=urn:btih:5KRX7IPMOWOC44JSDA5W3MUIEAADSQ6R" type="application/x-bittorrent"/></item>
-<item><title>[C] Show - 03</title><link>https://site/view/3</link>
+<item><title>[C&amp;amp;D] Show - 03</title><link>https://site/view/3</link>
   <enclosure url="https://site/3.torrent" type="application/x-bittorrent"/></item>
 </channel></rss>"""
 
@@ -68,6 +68,7 @@ def test_parse_feed():
     assert (a.url, a.info_hash) == ("https://nyaa.si/download/2.torrent", "eaa37fa1ec759c2e7132183b6db28820003943d1")
     assert b.info_hash == "eaa37fa1ec759c2e7132183b6db28820003943d1" and b.url.startswith("magnet:")
     assert (c.url, c.info_hash) == ("https://site/3.torrent", None)
+    assert c.title == "[C&D] Show - 03"  # double-escaped entity decoded
 
 
 def test_search_url_matches_legacy_format():

@@ -7,16 +7,28 @@ import { episodeStatus } from '../util'
 // Search results with how each title parses / filters. Unmatched rows are dimmed.
 const props = defineProps<{ items: PreviewItem[]; loading?: boolean; maxHeight?: number }>()
 
-type Row = PreviewItem & { key: number; first: boolean }
-// Like the scheduler: feeds are newest first and the first matching release per episode wins.
+type Row = PreviewItem & { key: number; first: boolean; rank: number }
+
+// Display order: will download, already has a status, duplicate, unrecognized / batch, filtered out.
+function rank(item: PreviewItem, first: boolean) {
+  if (!item.matched) return 4
+  if (item.batch || item.episode === null) return 3
+  if (item.status) return 1
+  return first ? 0 : 2
+}
+
+// Like the scheduler: feeds are newest first and the first matching release per episode wins,
+// so "first" is decided in feed order before sorting (sort is stable: feed order within a group).
 const rows = computed<Row[]>(() => {
   const seen = new Set<number>()
-  return props.items.map((item, key) => {
-    const usable = item.matched && item.episode !== null && !item.batch
-    const first = usable && !seen.has(item.episode!)
-    if (usable) seen.add(item.episode!)
-    return { ...item, key, first }
-  })
+  return props.items
+    .map((item, key) => {
+      const usable = item.matched && item.episode !== null && !item.batch
+      const first = usable && !seen.has(item.episode!)
+      if (usable) seen.add(item.episode!)
+      return { ...item, key, first, rank: rank(item, first) }
+    })
+    .sort((a, b) => a.rank - b.rank)
 })
 
 const columns = computed<DataTableColumns<Row>>(() => [
