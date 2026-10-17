@@ -1,5 +1,6 @@
 @echo off
-rem New anipik web UI + scheduler on http://127.0.0.1:8964
+rem Anipik: tray icon (web UI + scheduler + Discord bot), no console window.
+rem Console mode for debugging: .venv\Scripts\python -m anipik serve
 cd /d "%~dp0"
 if not exist anipik\web\dist\index.html (cd anipik\web && call npm install && call npm run build && cd /d "%~dp0")
-.venv\Scripts\python -m anipik serve %*
+start "" ".venv\Scripts\pythonw.exe" -m anipik tray --open %*

@@ -2,6 +2,8 @@
 
   migrate            import the legacy old/anime_rss.yaml + old/setting.yaml (re-runnable)
   scan [--dry-run]   search sources now and queue new episodes
+  tray               like serve, but as a tray icon without a console (use pythonw)
+  shortcut           create desktop / Start menu shortcuts that launch the tray (--startup, --remove)
   serve              web UI + API on http://127.0.0.1:8964, with the scheduler in-process
   run                scheduler loop only (scan every scan_interval, poll every poll_interval)
   status             subscriptions, active and attention-needing jobs
@@ -16,9 +18,7 @@
 import argparse
 import json
 import logging
-import os
 import sys
-from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -26,36 +26,10 @@ from sqlalchemy import func, select
 from . import config
 from .db import all_settings, make_session_factory, session_scope, set_setting
 from .downloaders import build_downloader
+from .instance import lock_path, single_instance
 from .migrate import migrate
 from .models import Episode, Job, Source, SourceBinding, Subscription
 from .scheduler import Scheduler
-
-
-@contextmanager
-def single_instance(path):
-    """OS lock released on crash; prevents two schedulers submitting the same jobs."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a+b") as lock:
-        lock.seek(0)
-        if not lock.read(1):
-            lock.write(b"0")
-            lock.flush()
-        lock.seek(0)
-        try:
-            if os.name == "nt":
-                import msvcrt
-                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            yield False
-            return
-        yield True
-
-
-def lock_path():
-    return config.DB_PATH.with_suffix(".lock")
 
 
 def cmd_migrate(factory, args):
@@ -115,6 +89,24 @@ def cmd_serve(factory, args):
         if args.host not in ("127.0.0.1", "localhost", "::1"):
             print(f"WARNING: the API has no authentication and is reachable on {args.host}")
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+
+
+def cmd_tray(factory, args):
+    from .tray import main as tray_main
+
+    tray_main(factory, args.host, args.port, args.open)
+
+
+def cmd_shortcut(factory, args):
+    from . import shortcuts
+
+    places = ["startup"] if args.startup else ["desktop", "startmenu"]
+    for where in places:
+        if args.remove:
+            shortcuts.remove(where)
+            print(f"removed {shortcuts.path(where)}")
+        else:
+            print(f"created {shortcuts.create(where)}")
 
 
 def cmd_status(factory, args):
@@ -249,6 +241,13 @@ def main(argv=None):
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8964)
     p.add_argument("--no-scheduler", action="store_true", help="UI/API only; a separate `run` does the work")
+    p = commands.add_parser("tray")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8964)
+    p.add_argument("--open", action="store_true", help="open the web UI once it is up")
+    p = commands.add_parser("shortcut")
+    p.add_argument("--startup", action="store_true", help="the login (autostart) shortcut instead")
+    p.add_argument("--remove", action="store_true")
     commands.add_parser("status")
     p = commands.add_parser("probe")
     p.add_argument("--downloader")

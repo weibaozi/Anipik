@@ -23,16 +23,20 @@ cd anipik\web && npm install && npm run build
 
 ## 使用
 
-1. 先完全退出 PikPak（包括托盘），然后双击 **run anipik.bat**（首次会自动构建前端），打开 http://127.0.0.1:8964。
-   anipik 会自动以调试端口（只监听本机）启动 PikPak；首次需要在客户端里登录。
-   客户端路径、端口和自动启动在「设置」页修改；如果 PikPak 已经以普通方式运行，在设置页点「重启 PikPak」。
-2. 在「来源」添加 RSS 站点（内置常用站点预设），在「订阅」新建订阅
-3. （可选）在设置页开启 Discord 通知，填写 bot token 和要通知的用户 / 频道 ID；机器人随 anipik 一起启动。
+1. 先完全退出 PikPak（包括托盘），然后双击 **run anipik.bat**（首次会自动构建前端）。
+   没有命令行窗口：Anipik 以**托盘图标**运行，并自动打开 http://127.0.0.1:8964。
+   想要桌面 / 开始菜单快捷方式，运行一次 `.venv\Scripts\python -m anipik shortcut`。
+2. anipik 会自动以调试端口（只监听本机）启动 PikPak 并最小化到托盘；首次需要在客户端里登录。
+   如果 PikPak 已经以普通方式运行，在设置页点「重启 PikPak」。
+3. 在「来源」添加 RSS 站点（内置常用站点预设），在「订阅」新建订阅
+4. （可选）在设置页开启 Discord 通知，填写 bot token 和要通知的用户 / 频道 ID；机器人随 anipik 一起启动。
    命令需要在 Developer Portal 开启 Message Content intent
 
-所有配置（媒体库目录、PikPak、调度、Discord）都在设置页里，保存在数据库中，没有配置文件。
+**托盘图标**：双击打开网页；右键菜单有 立即扫描 / 打开下载目录 / 打开日志 / 开机自启 / 重启 / 退出。
+悬停显示下载数和 PikPak 连接状态。再次启动时不会开第二个实例，只会打开网页。日志在 `data/anipik.log`。
 
-数据保存在 `data/anipik.db`（SQLite）。API 没有认证，默认只监听 127.0.0.1。
+所有配置（媒体库目录、PikPak、调度、Discord）都在设置页里，保存在数据库中，没有配置文件。
+数据保存在 `data/anipik.db`（SQLite）。API 没有认证，默认只监听 127.0.0.1；局域网访问用 `--host 0.0.0.0`。
 
 ## 命令行
 
@@ -42,7 +46,9 @@ cd anipik\web && npm install && npm run build
 
 | 命令 | 说明 |
 |---|---|
-| `serve` | Web 界面 + API，调度器在同一进程运行 |
+| `tray` | 托盘模式（无控制台，用 pythonw），`--open` 启动后打开网页 |
+| `serve` | 控制台模式：Web 界面 + API + 调度器，日志输出到窗口，便于调试 |
+| `shortcut` | 创建桌面 / 开始菜单快捷方式（`--startup` 开机自启，`--remove` 删除） |
 | `run` | 只运行调度器（无界面） |
 | `scan --dry-run` | 预览这次扫描会下载什么，不提交任何任务 |
 | `status` / `probe` | 订阅和任务概况 / 检测下载器连接 |

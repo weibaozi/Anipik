@@ -9,6 +9,8 @@ bencodepy==0.9.5
 PyYAML>=6.0
 fastapi>=0.115,<1
 discord.py>=2.4,<3
+pystray>=0.19
+Pillow>=10
 uvicorn>=0.30
 pytest>=8
 httpx>=0.27
