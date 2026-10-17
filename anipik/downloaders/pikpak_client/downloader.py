@@ -199,6 +199,10 @@ class PikPakClientDownloader(Downloader):
                 return
 
         files = state["files"]
+        if not bridge.kernel_ready:
+            # Local tasks only exist in the main window once its download kernel is up; judging
+            # them from anywhere else would look like "missing" and trigger a resubmission.
+            raise TransientError("PikPak 下载内核尚未就绪（客户端启动中或未登录）")
         tasks = bridge.local_tasks([f["id"] for f in files])
         by_path = {(t["file_id"], _norm(t["path"])): t for t in tasks}
         complete, missing, active, downloaded_bytes = 0, [], [], 0

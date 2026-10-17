@@ -31,6 +31,7 @@ MODULES = {
     "path": 76760,            # .join
     "download_action": 19574, # .A(files, destination): the official "Download" action (lazy)
     "download_chunk": None,   # optional fixed chunk id; None = find it in the client's files
+    "download_kernel": 66440, # DownloadKernelManager: loaded only in the main window
 }
 _CHUNK_CACHE = {}  # (chunk dir, module id) -> chunk ids that contain it
 EXPORTS = {
@@ -65,6 +66,7 @@ class PikPakBridge:
         self.ws = None
         self.sequence = 0
         self.renderer_url = None
+        self.kernel_ready = False  # connected page has the initialized download kernel
 
     # -- transport ---------------------------------------------------------------
     def _http_json(self, path):
@@ -85,6 +87,15 @@ class PikPakBridge:
         return Template(template).substitute(values)
 
     def connect(self):
+        """Attach to the client's main window.
+
+        The client opens several windows from the same page (main #/all, file manager,
+        players). All expose the cloud API, but only the main window initializes the
+        download kernel and holds the local task list, and the window order varies (a
+        tray-only launch creates the helper windows first). So rank every page:
+        2 = kernel ready, 1 = kernel module loaded (still initializing), 0 = cloud API only.
+        """
+        best = None  # (rank, ws, url)
         for target in self._http_json("/json/list"):
             if target.get("type") != "page" or "main-renderer/index.html" not in target.get("url", ""):
                 continue
@@ -92,25 +103,35 @@ class PikPakBridge:
                 target["webSocketDebuggerUrl"], timeout=self.timeout, suppress_origin=True,
                 http_no_proxy=["127.0.0.1", "localhost"],
             )
-            self.renderer_url = target["url"]
             try:
-                ready = self.evaluate(self._js("""(() => {
-                    if (!globalThis.webpackChunkpikpak_web) return false;
+                rank = self.evaluate(self._js("""(() => {
+                    if (!globalThis.webpackChunkpikpak_web) return -1;
                     globalThis.webpackChunkpikpak_web.push([
                         ['anipik_bridge_' + Date.now()], {},
                         r => { globalThis.__pikpakPythonRequire = r; }
                     ]);
                     const r = globalThis.__pikpakPythonRequire;
                     const drive = r && r($m_drive);
-                    return !!(drive && drive[$e_add_task] && drive[$e_list_tasks]);
+                    if (!(drive && drive[$e_add_task] && drive[$e_list_tasks])) return -1;
+                    const tm = r.c[$m_task_manager] && r($m_task_manager)._.getTaskManager();
+                    return tm && tm.isDkLoaded() ? 2 : r.c[$m_download_kernel] ? 1 : 0;
                 })()"""))
-                if ready:
-                    return self
             except BridgeError:
-                pass
-            self.close()
-        raise ConnectionError("No compatible PikPak renderer found; is the client started with the "
-                              "debug port and logged in? (python -m anipik probe)")
+                rank = -1
+            if rank >= 0 and (best is None or rank > best[0]):
+                if best:
+                    best[1].close()
+                best, self.ws = (rank, self.ws, target["url"]), None
+                if rank == 2:
+                    break
+            else:
+                self.close()
+        if best is None:
+            raise ConnectionError("No compatible PikPak renderer found; is the client started with the "
+                                  "debug port and logged in? (python -m anipik probe)")
+        self.kernel_ready = best[0] == 2
+        _, self.ws, self.renderer_url = best
+        return self
 
     def evaluate(self, expression):
         if self.ws is None:
@@ -201,6 +222,7 @@ class PikPakBridge:
         })()"""))
         if lazy_error:
             result["download_action"] = lazy_error
+        result["download_kernel"] = True if self.kernel_ready else "not ready (client starting or not logged in)"
         return result
 
     # -- cloud -------------------------------------------------------------------

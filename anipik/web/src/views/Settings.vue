@@ -70,6 +70,7 @@ const moduleLabels: Record<string, string> = {
   task_status: '本地任务状态',
   path: '路径工具',
   download_action: '下载到本地',
+  download_kernel: '下载内核（主窗口）',
 }
 const pikpak = () =>
   settings.value!['downloader.pikpak_client'] as { port: number; exe_path: string; auto_start: boolean; start_hidden: boolean }

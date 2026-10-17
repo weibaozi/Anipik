@@ -16,6 +16,7 @@ class FakeBridge:
         self.started = []
         self.instance = "launch-1"
         self.fail_next = None
+        self.kernel_ready = True
         self.files = [{"id": "f1", "size": 4, "name": "ep01.mkv", "parents": []},
                       {"id": "f2", "size": 2, "name": "sub.ass", "parents": [{"id": "d", "name": "Subs"}]}]
 
@@ -150,6 +151,19 @@ def test_respects_manual_pause(env):
     tick()
     tick()
     assert bridge.started == [] and "手动暂停" in state["wait_reason"]
+
+
+def test_local_stage_waits_for_download_kernel(env):
+    bridge, job, state, _, tick = env
+    tick()
+    bridge.cloud["t0"].update(phase="PHASE_TYPE_COMPLETE", file_id="root", progress=100)
+    bridge.kernel_ready = False  # connected to a helper window / client still starting
+    with pytest.raises(TransientError, match="下载内核"):
+        tick()
+    assert bridge.local == [] and state["phase"] == "local_ready"  # nothing submitted, nothing misjudged
+    bridge.kernel_ready = True
+    tick()
+    assert len(bridge.local) == 2
 
 
 def test_reuses_existing_cloud_task(env):
