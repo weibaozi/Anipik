@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NAlert,
   NButton,
@@ -9,21 +10,32 @@ import {
   NInputNumber,
   NSpin,
   NSwitch,
+  NTabPane,
+  NTabs,
   NTag,
   useDialog,
   useMessage,
+  useThemeVars,
 } from 'naive-ui'
 import { api, type DiscordStatus, type Health, type Settings } from '../api'
-import { status } from '../store'
+import { refreshStatus, status } from '../store'
 import { errorText, usePolling } from '../util'
 
+type Tab = 'app' | 'pikpak' | 'notify'
+const route = useRoute()
+const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
+const themeVars = useThemeVars()
+
+const tab = ref<Tab>((['app', 'pikpak', 'notify'] as Tab[]).includes(route.query.tab as Tab) ? (route.query.tab as Tab) : 'app')
+watch(tab, (value) => router.replace({ query: { ...route.query, tab: value } }))
+
+// --- load / save --------------------------------------------------------------------
 const settings = ref<Settings | null>(null)
 const original = ref('')
 const saving = ref(false)
-const health = ref<Health | null>(null)
-const probing = ref(false)
+const dirty = computed(() => !!settings.value && JSON.stringify(settings.value) !== original.value)
 
 onMounted(async () => {
   try {
@@ -58,9 +70,12 @@ async function save() {
   if (!Object.keys(changed).length) return message.info('没有修改')
   saving.value = true
   try {
-    settings.value = await api.updateSettings(changed)
+    const saved = await api.updateSettings(changed)
+    saved['notify.discord.ids'] = settings.value['notify.discord.ids']
+    saved['downloader.pikpak_client'] = { ...settings.value['downloader.pikpak_client'], ...saved['downloader.pikpak_client'] }
+    settings.value = saved
     original.value = JSON.stringify(settings.value)
-    message.success('已保存')
+    message.success(restartNeeded.value ? '已保存，端口 / 监听地址需要重启 Anipik 后生效' : '已保存')
   } catch (error) {
     message.error(errorText(error))
   } finally {
@@ -68,6 +83,66 @@ async function save() {
   }
 }
 
+// --- web server (程序) ----------------------------------------------------------------
+const lan = computed({
+  get: () => settings.value?.['server.host'] === '0.0.0.0',
+  set: (on: boolean) => {
+    if (settings.value) settings.value['server.host'] = on ? '0.0.0.0' : '127.0.0.1'
+  },
+})
+const savedServer = computed(() => {
+  const saved = original.value ? JSON.parse(original.value) : {}
+  return { host: saved['server.host'] as string, port: Number(saved['server.port']) }
+})
+const running = computed(() => status.value?.server)
+const restartNeeded = computed(
+  () => !!running.value?.port && (savedServer.value.host !== running.value.host || savedServer.value.port !== running.value.port),
+)
+const restarting = ref(false)
+
+function restartApp() {
+  const { host, port } = savedServer.value
+  const remote = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  dialog.warning({
+    title: '重启 Anipik',
+    content:
+      remote && host !== '0.0.0.0'
+        ? '重启后只监听本机，从这台设备将无法再访问。确定重启？'
+        : `重启后网页地址变为端口 ${port}，页面会自动跳转。进行中的下载不受影响。`,
+    positiveText: '重启',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      restarting.value = true
+      try {
+        await api.restartApp()
+      } catch (error) {
+        restarting.value = false
+        message.error(errorText(error))
+        return
+      }
+      const target = `${location.protocol}//${location.hostname}:${port}/settings?tab=app`
+      // The new instance is on another origin when the port changed: probe it opaquely.
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 1000))
+        try {
+          await fetch(`${location.protocol}//${location.hostname}:${port}/api/status`, { mode: 'no-cors', cache: 'no-store' })
+          if (i > 1) {
+            location.href = target
+            return
+          }
+        } catch {
+          /* still restarting */
+        }
+      }
+      restarting.value = false
+      message.warning(`重启后没有连上，请手动打开 ${target}`)
+    },
+  })
+}
+
+// --- PikPak ---------------------------------------------------------------------------
+const health = ref<Health | null>(null)
+const probing = ref(false)
 async function probe() {
   probing.value = true
   try {
@@ -78,7 +153,6 @@ async function probe() {
     probing.value = false
   }
 }
-
 const moduleLabels: Record<string, string> = {
   drive: '云盘 / 云下载接口',
   task_meta: '任务元数据',
@@ -89,38 +163,6 @@ const moduleLabels: Record<string, string> = {
   download_action: '下载到本地',
   download_kernel: '下载内核（主窗口）',
 }
-// --- discord bot
-const discord = ref<DiscordStatus | null>(null)
-usePolling(async () => {
-  try {
-    discord.value = await api.discordStatus()
-  } catch {
-    /* shown as unknown */
-  }
-}, 3000)
-const botStates: Record<string, { label: string; type: 'success' | 'warning' | 'error' | 'default' | 'info' }> = {
-  connected: { label: '已连接', type: 'success' },
-  starting: { label: '连接中…', type: 'info' },
-  reconnecting: { label: '重连中…', type: 'warning' },
-  disabled: { label: '未启用', type: 'default' },
-  no_token: { label: '缺少 token', type: 'warning' },
-  error: { label: '出错', type: 'error' },
-  stopped: { label: '已停止', type: 'default' },
-  not_in_process: { label: '由独立调度进程运行', type: 'default' },
-}
-const testing = ref(false)
-async function sendTest() {
-  testing.value = true
-  try {
-    await api.discordTest()
-    message.success('测试消息已加入发送队列')
-  } catch (error) {
-    message.error(errorText(error))
-  } finally {
-    testing.value = false
-  }
-}
-
 const pikpak = () =>
   settings.value!['downloader.pikpak_client'] as { port: number; exe_path: string; auto_start: boolean; start_hidden: boolean }
 
@@ -155,6 +197,39 @@ function restartClient() {
     },
   })
 }
+
+// --- 通知 -------------------------------------------------------------------------------
+const discord = ref<DiscordStatus | null>(null)
+usePolling(async () => {
+  try {
+    discord.value = await api.discordStatus()
+  } catch {
+    /* shown as unknown */
+  }
+}, 3000)
+usePolling(refreshStatus, 5000)
+const botStates: Record<string, { label: string; type: 'success' | 'warning' | 'error' | 'default' | 'info' }> = {
+  connected: { label: '已连接', type: 'success' },
+  starting: { label: '连接中…', type: 'info' },
+  reconnecting: { label: '重连中…', type: 'warning' },
+  disabled: { label: '未启用', type: 'default' },
+  no_token: { label: '缺少 token', type: 'warning' },
+  error: { label: '出错', type: 'error' },
+  stopped: { label: '已停止', type: 'default' },
+  not_in_process: { label: '由独立调度进程运行', type: 'default' },
+}
+const testing = ref(false)
+async function sendTest() {
+  testing.value = true
+  try {
+    await api.discordTest()
+    message.success('测试消息已加入发送队列')
+  } catch (error) {
+    message.error(errorText(error))
+  } finally {
+    testing.value = false
+  }
+}
 </script>
 
 <template>
@@ -162,135 +237,186 @@ function restartClient() {
     <div class="page-header"><h1>设置</h1></div>
     <n-spin v-if="!settings" style="width: 100%; margin-top: 60px" />
     <template v-else>
-      <n-card title="下载器 · PikPak 客户端" size="small" class="section">
-        <template #header-extra>
-          <n-button size="small" :loading="probing" @click="probe">检测连接</n-button>
-        </template>
-        <div v-if="health" class="health">
-          <n-tag :type="health.ok ? 'success' : 'error'" round>{{ health.ok ? '可用' : '不可用' }}</n-tag>
-          <span v-if="health.version" class="muted mono">{{ health.version.match(/PikPak\/[\d.]+/)?.[0] ?? health.version }}</span>
-        </div>
-        <div v-if="health?.client" class="client">
-          <span>进程 <b :class="health.client.process_running ? 'ok' : 'bad'">{{ health.client.process_running ? '运行中' : '未运行' }}</b></span>
-          <span>调试端口 <b :class="health.client.port_open ? 'ok' : 'bad'">{{ health.client.port_open ? '已开启' : '未开启' }}</b></span>
-          <span class="mono muted">{{ health.client.exe ?? '未找到 PikPak.exe' }}</span>
-        </div>
-        <n-alert v-if="health && !health.ok" type="error" :show-icon="false" style="margin: 10px 0">
-          <template v-if="health.client?.process_running && !health.client.port_open">
-            PikPak 正在运行，但不是以调试端口启动的。点「重启 PikPak」由 anipik 重新启动它。
-          </template>
-          <template v-else-if="health.client && !health.client.process_running">
-            PikPak 没有运行。点「启动 PikPak」，或开启自动启动后由调度器在需要时启动。
-          </template>
-          <template v-else>{{ health.error || '部分客户端模块不可用，客户端可能已更新' }}</template>
-        </n-alert>
-        <div class="actions">
-          <n-button size="small" type="primary" secondary :loading="acting" :disabled="health?.client?.port_open" @click="startClient">启动 PikPak</n-button>
-          <n-button size="small" :loading="acting" :disabled="!health?.client?.process_running" @click="restartClient">重启 PikPak</n-button>
-        </div>
-        <div v-if="health?.modules" class="modules">
-          <div v-for="(value, key) in health.modules" :key="key" class="module">
-            <span :class="value === true ? 'ok' : 'bad'">{{ value === true ? '✓' : '✗' }}</span>
-            {{ moduleLabels[key] ?? key }}
-            <span v-if="value !== true" class="muted small">{{ value }}</span>
-          </div>
-        </div>
-        <div class="form-grid" style="margin-top: 14px">
-          <label>客户端路径</label>
-          <div>
-            <n-input v-model:value="pikpak().exe_path" :placeholder="health?.client?.exe ?? 'C:\\Program Files\\PikPak\\PikPak.exe'" clearable />
-            <div class="muted small">留空则自动查找默认安装位置</div>
-          </div>
-          <label>自动启动</label>
-          <div>
-            <n-switch v-model:value="pikpak().auto_start" />
-            <div class="muted small">anipik 启动时、以及有下载任务但客户端没运行时，自动以调试端口启动 PikPak</div>
-          </div>
-          <label>最小化到托盘</label>
-          <div>
-            <n-switch v-model:value="pikpak().start_hidden" />
-            <div class="muted small">由 anipik 启动 / 重启时不弹出窗口，只在托盘显示（与客户端「开机自启」相同的方式），双击托盘图标可打开</div>
-          </div>
-          <label>调试端口</label>
-          <n-input-number v-model:value="pikpak().port" :min="1" :max="65535" style="width: 140px" />
-        </div>
-      </n-card>
+      <n-tabs v-model:value="tab" type="line" animated>
+        <!-- 程序 -->
+        <n-tab-pane name="app" display-directive="show">
+          <template #tab>程序</template>
+          <n-card title="Web 服务" size="small" class="section">
+            <n-alert v-if="restartNeeded" type="warning" :show-icon="false" class="restart">
+              <div>
+                端口 / 监听地址已修改，重启 Anipik 后生效（当前运行于
+                <span class="mono">{{ running?.host }}:{{ running?.port }}</span>）
+              </div>
+              <n-button v-if="running?.can_restart" size="small" type="warning" :loading="restarting" @click="restartApp">立即重启</n-button>
+              <span v-else class="small muted">命令行模式运行中，请手动重启</span>
+            </n-alert>
+            <div class="form-grid">
+              <label>端口</label>
+              <div>
+                <n-input-number v-model:value="settings['server.port']" :min="1" :max="65535" :show-button="false" style="width: 140px" />
+                <div class="muted small">网页地址 http://127.0.0.1:{{ settings['server.port'] }}</div>
+              </div>
+              <label>局域网访问</label>
+              <div>
+                <n-switch v-model:value="lan" />
+                <div class="muted small">开启后监听 0.0.0.0，同一局域网的手机 / 电脑可以访问</div>
+                <n-alert v-if="lan" type="warning" :show-icon="false" class="lan-warn">
+                  网页和接口没有登录验证：能连上这个端口的人都可以修改订阅、触发下载、重启 PikPak。只在可信的家庭网络开启，不要做端口转发到公网。
+                </n-alert>
+                <div v-if="running?.addresses?.length" class="addresses">
+                  <span class="muted small">局域网地址：</span>
+                  <a v-for="ip in running.addresses" :key="ip" class="mono" :href="`http://${ip}:${running.port}`" target="_blank">
+                    http://{{ ip }}:{{ running.port }}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </n-card>
 
-      <n-card title="下载" size="small" class="section">
-        <div class="form-grid">
-          <label>媒体库根目录</label>
-          <div>
-            <n-input v-model:value="settings.library_root" placeholder="N:\新番" />
-            <div class="muted small">订阅的保存目录相对于这里</div>
-          </div>
-          <label>同时下载数</label>
-          <n-input-number v-model:value="settings.max_active_jobs" :min="1" :max="50" style="width: 140px" />
-          <label>失败重试次数</label>
-          <n-input-number v-model:value="settings.max_attempts" :min="1" :max="20" style="width: 140px" />
-        </div>
-      </n-card>
+          <n-card title="下载" size="small" class="section">
+            <div class="form-grid">
+              <label>媒体库根目录</label>
+              <div>
+                <n-input v-model:value="settings.library_root" placeholder="N:\新番" />
+                <div class="muted small">订阅的保存目录相对于这里</div>
+              </div>
+              <label>同时下载数</label>
+              <n-input-number v-model:value="settings.max_active_jobs" :min="1" :max="50" style="width: 140px" />
+              <label>失败重试次数</label>
+              <n-input-number v-model:value="settings.max_attempts" :min="1" :max="20" style="width: 140px" />
+            </div>
+          </n-card>
 
-      <n-card title="调度" size="small" class="section">
-        <div class="form-grid">
-          <label>扫描间隔</label>
-          <div class="inline"><n-input-number v-model:value="settings.scan_interval" :min="60" :step="60" style="width: 140px" /> 秒</div>
-          <label>进度轮询</label>
-          <div class="inline"><n-input-number v-model:value="settings.poll_interval" :min="2" style="width: 140px" /> 秒</div>
-          <label>连接失败上限</label>
-          <div>
-            <n-input-number v-model:value="settings.max_transient_errors" :min="1" style="width: 140px" />
-            <div class="muted small">单个任务连续出错这么多次后转为「需要处理」</div>
-          </div>
-        </div>
-      </n-card>
+          <n-card title="调度" size="small" class="section">
+            <div class="form-grid">
+              <label>扫描间隔</label>
+              <div class="inline"><n-input-number v-model:value="settings.scan_interval" :min="60" :step="60" style="width: 140px" /> 秒</div>
+              <label>进度轮询</label>
+              <div class="inline"><n-input-number v-model:value="settings.poll_interval" :min="2" style="width: 140px" /> 秒</div>
+              <label>连接失败上限</label>
+              <div>
+                <n-input-number v-model:value="settings.max_transient_errors" :min="1" style="width: 140px" />
+                <div class="muted small">单个任务连续出错这么多次后转为「需要处理」</div>
+              </div>
+            </div>
+          </n-card>
+          <div class="muted mono small db">数据库 {{ status?.db }}</div>
+        </n-tab-pane>
 
-      <n-card title="通知 · Discord 机器人" size="small" class="section">
-        <template #header-extra>
-          <n-button size="small" :loading="testing" :disabled="discord?.status.state !== 'connected'" @click="sendTest">发送测试消息</n-button>
-        </template>
-        <div v-if="discord" class="client">
-          <n-tag size="small" round :type="(botStates[discord.status.state] ?? botStates.stopped).type">
-            {{ (botStates[discord.status.state] ?? { label: discord.status.state }).label }}
-          </n-tag>
-          <span v-if="discord.status.user">{{ discord.status.user }}</span>
-          <span v-if="discord.status.state === 'connected' && discord.status.commands === false" class="muted">
-            未开启 Message Content intent，命令不可用（通知正常）
-          </span>
-          <span class="muted">待发送 {{ discord.outbox.pending }}</span>
-        </div>
-        <n-alert v-if="discord?.status.error" type="error" :show-icon="false" style="margin-top: 10px">{{ discord.status.error }}</n-alert>
-        <n-alert v-if="discord?.outbox.last?.error" type="warning" :show-icon="false" style="margin-top: 10px">
-          最近一条未送达：{{ discord.outbox.last.error }}
-        </n-alert>
-        <div class="form-grid" style="margin-top: 14px">
-          <label>启用</label>
-          <div>
-            <n-switch v-model:value="settings['notify.discord.enabled']" />
-            <div class="muted small">随 anipik 一起启动；下载完成 / 失败 / 需要处理时发消息</div>
-          </div>
-          <label>Bot token</label>
-          <div>
-            <n-input
-              v-model:value="settings['notify.discord.token']"
-              type="password"
-              show-password-on="click"
-              :placeholder="settings['notify.discord.token_set'] ? '已设置（留空保持不变）' : '粘贴 Discord bot token'"
-            />
-          </div>
-          <label>用户 ID</label>
-          <div>
-            <n-dynamic-tags v-model:value="settings['notify.discord.ids'].user_id" />
-            <div class="muted small">私信给这些用户（开发者模式下右键用户 → 复制用户 ID）</div>
-          </div>
-          <label>频道 ID</label>
-          <n-dynamic-tags v-model:value="settings['notify.discord.ids'].channel_id" />
-        </div>
-        <div class="muted small" style="margin-top: 10px">命令：!status 下载状态 · !scan 立即扫描 · !help</div>
-      </n-card>
+        <!-- PikPak -->
+        <n-tab-pane name="pikpak" display-directive="show">
+          <template #tab>PikPak</template>
+          <n-card title="PikPak 客户端" size="small" class="section">
+            <template #header-extra>
+              <n-button size="small" :loading="probing" @click="probe">检测连接</n-button>
+            </template>
+            <div v-if="health" class="health">
+              <n-tag :type="health.ok ? 'success' : 'error'" round>{{ health.ok ? '可用' : '不可用' }}</n-tag>
+              <span v-if="health.version" class="muted mono">{{ health.version.match(/PikPak\/[\d.]+/)?.[0] ?? health.version }}</span>
+            </div>
+            <div v-if="health?.client" class="client">
+              <span>进程 <b :class="health.client.process_running ? 'ok' : 'bad'">{{ health.client.process_running ? '运行中' : '未运行' }}</b></span>
+              <span>调试端口 <b :class="health.client.port_open ? 'ok' : 'bad'">{{ health.client.port_open ? '已开启' : '未开启' }}</b></span>
+              <span class="mono muted">{{ health.client.exe ?? '未找到 PikPak.exe' }}</span>
+            </div>
+            <n-alert v-if="health && !health.ok" type="error" :show-icon="false" style="margin: 10px 0">
+              <template v-if="health.client?.process_running && !health.client.port_open">
+                PikPak 正在运行，但不是以调试端口启动的。点「重启 PikPak」由 anipik 重新启动它。
+              </template>
+              <template v-else-if="health.client && !health.client.process_running">
+                PikPak 没有运行。点「启动 PikPak」，或开启自动启动后由调度器在需要时启动。
+              </template>
+              <template v-else>{{ health.error || '部分客户端模块不可用，客户端可能已更新' }}</template>
+            </n-alert>
+            <div class="actions">
+              <n-button size="small" type="primary" secondary :loading="acting" :disabled="health?.client?.port_open" @click="startClient">启动 PikPak</n-button>
+              <n-button size="small" :loading="acting" :disabled="!health?.client?.process_running" @click="restartClient">重启 PikPak</n-button>
+            </div>
+            <div v-if="health?.modules" class="modules">
+              <div v-for="(value, key) in health.modules" :key="key">
+                <span :class="value === true ? 'ok' : 'bad'">{{ value === true ? '✓' : '✗' }}</span>
+                {{ moduleLabels[key] ?? key }}
+                <span v-if="value !== true" class="muted small">{{ value }}</span>
+              </div>
+            </div>
+          </n-card>
 
-      <div class="footer">
-        <span class="muted mono">{{ status?.db }}</span>
-        <n-button type="primary" :loading="saving" @click="save">保存设置</n-button>
+          <n-card title="启动方式" size="small" class="section">
+            <div class="form-grid">
+              <label>客户端路径</label>
+              <div>
+                <n-input v-model:value="pikpak().exe_path" :placeholder="health?.client?.exe ?? 'C:\\Program Files\\PikPak\\PikPak.exe'" clearable />
+                <div class="muted small">留空则自动查找默认安装位置</div>
+              </div>
+              <label>自动启动</label>
+              <div>
+                <n-switch v-model:value="pikpak().auto_start" />
+                <div class="muted small">anipik 启动时、以及有下载任务但客户端没运行时，自动以调试端口启动 PikPak</div>
+              </div>
+              <label>最小化到托盘</label>
+              <div>
+                <n-switch v-model:value="pikpak().start_hidden" />
+                <div class="muted small">由 anipik 启动 / 重启时不弹出窗口，只在托盘显示，双击托盘图标可打开</div>
+              </div>
+              <label>调试端口</label>
+              <div>
+                <n-input-number v-model:value="pikpak().port" :min="1" :max="65535" :show-button="false" style="width: 140px" />
+                <div class="muted small">只监听本机 127.0.0.1</div>
+              </div>
+            </div>
+          </n-card>
+        </n-tab-pane>
+
+        <!-- 通知 -->
+        <n-tab-pane name="notify" display-directive="show">
+          <template #tab>通知</template>
+          <n-card title="Discord 机器人" size="small" class="section">
+            <template #header-extra>
+              <n-button size="small" :loading="testing" :disabled="discord?.status.state !== 'connected'" @click="sendTest">发送测试消息</n-button>
+            </template>
+            <div v-if="discord" class="client">
+              <n-tag size="small" round :type="(botStates[discord.status.state] ?? botStates.stopped).type">
+                {{ (botStates[discord.status.state] ?? { label: discord.status.state }).label }}
+              </n-tag>
+              <span v-if="discord.status.user">{{ discord.status.user }}</span>
+              <span v-if="discord.status.state === 'connected' && discord.status.commands === false" class="muted">
+                未开启 Message Content intent，命令不可用（通知正常）
+              </span>
+              <span class="muted">待发送 {{ discord.outbox.pending }}</span>
+            </div>
+            <n-alert v-if="discord?.status.error" type="error" :show-icon="false" style="margin-top: 10px">{{ discord.status.error }}</n-alert>
+            <n-alert v-if="discord?.outbox.last?.error" type="warning" :show-icon="false" style="margin-top: 10px">
+              最近一条未送达：{{ discord.outbox.last.error }}
+            </n-alert>
+            <div class="form-grid" style="margin-top: 14px">
+              <label>启用</label>
+              <div>
+                <n-switch v-model:value="settings['notify.discord.enabled']" />
+                <div class="muted small">随 anipik 一起启动；下载完成 / 失败 / 需要处理时发消息</div>
+              </div>
+              <label>Bot token</label>
+              <n-input
+                v-model:value="settings['notify.discord.token']"
+                type="password"
+                show-password-on="click"
+                :placeholder="settings['notify.discord.token_set'] ? '已设置（留空保持不变）' : '粘贴 Discord bot token'"
+              />
+              <label>用户 ID</label>
+              <div>
+                <n-dynamic-tags v-model:value="settings['notify.discord.ids'].user_id" />
+                <div class="muted small">私信给这些用户（开发者模式下右键用户 → 复制用户 ID）</div>
+              </div>
+              <label>频道 ID</label>
+              <n-dynamic-tags v-model:value="settings['notify.discord.ids'].channel_id" />
+            </div>
+            <div class="muted small" style="margin-top: 10px">命令：!status 下载状态 · !scan 立即扫描 · !help</div>
+          </n-card>
+        </n-tab-pane>
+      </n-tabs>
+
+      <div class="footer" :style="{ background: themeVars.bodyColor, borderColor: themeVars.dividerColor }">
+        <span class="small" :class="dirty ? 'dirty' : 'muted'">{{ dirty ? '有未保存的修改' : '所有修改已保存' }}</span>
+        <n-button type="primary" :loading="saving" :disabled="!dirty" @click="save">保存设置</n-button>
       </div>
     </template>
   </div>
@@ -301,7 +427,31 @@ function restartClient() {
   max-width: 860px;
 }
 .section {
-  margin-bottom: 16px;
+  margin: 16px 0;
+}
+.restart {
+  display: flex;
+  margin-bottom: 14px;
+}
+.restart :deep(.n-alert-body__content) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.lan-warn {
+  margin-top: 8px;
+}
+.addresses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  margin-top: 8px;
+}
+.addresses a {
+  color: inherit;
 }
 .client {
   display: flex;
@@ -355,12 +505,35 @@ function restartClient() {
   align-items: center;
   gap: 8px;
 }
+.db {
+  margin: 4px 0 8px;
+  word-break: break-all;
+}
 .footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 8px 0 30px;
-  flex-wrap: wrap;
+  padding: 12px 0 16px;
+  border-top: 1px solid;
+}
+.footer .small {
+  margin-top: 0;
+}
+.dirty {
+  color: #f0a020;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .form-grid > label {
+    padding-top: 8px;
+  }
 }
 </style>

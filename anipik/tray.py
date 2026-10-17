@@ -76,7 +76,8 @@ class TrayApp:
 
         self.scheduler = Scheduler(self.factory)
         bot = DiscordBot(self.factory, on_scan=self.scheduler.request_scan)
-        app = create_app(self.factory, self.scheduler, run_scheduler=True, bot=bot)
+        app = create_app(self.factory, self.scheduler, run_scheduler=True, bot=bot,
+                         server={"host": self.host, "port": self.port}, on_restart=self._restart)
         # log_config=None: uvicorn logs go to the root (file) handler, not a console.
         self.server = uvicorn.Server(uvicorn.Config(app, host=self.host, port=self.port,
                                                     log_config=None, access_log=False))
@@ -186,7 +187,8 @@ class TrayApp:
 
 def relaunch():
     """Start a fresh process with the same arguments (after this one released lock and port)."""
-    args = [str(shortcuts.pythonw()), "-m", "anipik", *sys.argv[1:]]
+    # Without --open: the page that asked for the restart reconnects by itself.
+    args = [str(shortcuts.pythonw()), "-m", "anipik", *(a for a in sys.argv[1:] if a != "--open")]
     flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     subprocess.Popen(args, cwd=config.ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, close_fds=True, creationflags=flags)

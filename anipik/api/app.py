@@ -97,9 +97,22 @@ def source_out(source, binding_count=0):
 
 
 # -- app -----------------------------------------------------------------------------
-def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None):
+def lan_addresses():
+    """IPv4 addresses other devices on the LAN could use to reach this machine."""
+    import socket
+
+    found = set()
+    try:
+        found.update(info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET))
+    except OSError:
+        pass
+    return sorted(a for a in found if not a.startswith("127.") and not a.startswith("169.254."))
+
+
+def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None, server=None, on_restart=None):
     """scheduler: shared Scheduler (for status / scan requests). run_scheduler: run its loop in a thread.
-    bot: DiscordBot to run in this process (only where the scheduler runs, so messages go out once)."""
+    bot: DiscordBot to run in this process (only where the scheduler runs, so messages go out once).
+    server: {"host", "port"} actually bound. on_restart: restarts the whole app (tray mode)."""
     http = Http(retries=1, timeout=20)
     thread_holder = {}
 
@@ -150,7 +163,17 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None
             subs = session.scalar(select(func.count()).select_from(Subscription).where(Subscription.enabled))
         sched = dict(scheduler.status) if scheduler is not None else {"running": False}
         return {"scheduler": sched, "scheduler_in_process": scheduler is not None and run_scheduler,
-                "downloader": settings["downloader"], "jobs": jobs, "subscriptions": subs, "db": str(config.DB_PATH)}
+                "downloader": settings["downloader"], "jobs": jobs, "subscriptions": subs, "db": str(config.DB_PATH),
+                "server": {**(server or {}), "can_restart": on_restart is not None,
+                           "addresses": lan_addresses() if (server or {}).get("host") == "0.0.0.0" else []}}
+
+    @api.post("/app/restart")
+    def restart_app():
+        """Restart the whole app (applies server.host / server.port). Tray mode only."""
+        if on_restart is None:
+            raise HTTPException(409, "当前以命令行模式运行，请手动重启")
+        threading.Timer(0.5, on_restart).start()  # let this response go out first
+        return {"restarting": True}
 
     @api.post("/scan")
     def scan_now():
@@ -436,6 +459,14 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None
                 raise HTTPException(422, f"{key}: expected {type(default).__name__}")
         if "downloader" in body and body["downloader"] not in DOWNLOADERS:
             raise HTTPException(422, f"unknown downloader {body['downloader']!r}")
+        if "server.host" in body:
+            import ipaddress
+            try:
+                ipaddress.ip_address(body["server.host"])
+            except ValueError:
+                raise HTTPException(422, "server.host must be an IP address, e.g. 127.0.0.1 or 0.0.0.0")
+        if "server.port" in body and not 1 <= int(body["server.port"]) <= 65535:
+            raise HTTPException(422, "server.port must be 1-65535")
         with session_scope(factory) as session:
             for key, value in body.items():
                 set_setting(session, key, value)

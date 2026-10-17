@@ -58,7 +58,7 @@ def test_menu_actions(factory):
 
 def test_relaunch_reuses_arguments(monkeypatch):
     calls = []
-    monkeypatch.setattr(sys, "argv", ["G:/x/anipik/__main__.py", "--db", "data/a.db", "tray", "--port", "9000"])
+    monkeypatch.setattr(sys, "argv", ["G:/x/anipik/__main__.py", "--db", "data/a.db", "tray", "--open", "--port", "9000"])
     monkeypatch.setattr(tray.subprocess, "Popen", lambda args, **kw: calls.append((args, kw)))
     tray.relaunch()
     args, kw = calls[0]

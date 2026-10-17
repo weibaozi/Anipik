@@ -72,12 +72,20 @@ def cmd_run(factory, args):
             bot.stop()
 
 
+def server_address(factory, args):
+    """--host/--port when given, else the server.host / server.port settings."""
+    with session_scope(factory) as session:
+        settings = all_settings(session)
+    return args.host or settings["server.host"], args.port or int(settings["server.port"])
+
+
 def cmd_serve(factory, args):
     import uvicorn
 
     from .api import create_app
     from .discord_bot import DiscordBot
 
+    host, port = server_address(factory, args)
     with single_instance(lock_path()) as acquired:
         run_scheduler = acquired and not args.no_scheduler
         if not acquired and not args.no_scheduler:
@@ -85,16 +93,18 @@ def cmd_serve(factory, args):
         scheduler = Scheduler(factory)
         # The bot lives with the scheduler so each notification is delivered by one process only.
         bot = DiscordBot(factory, on_scan=scheduler.request_scan) if run_scheduler else None
-        app = create_app(factory, scheduler, run_scheduler=run_scheduler, bot=bot)
-        if args.host not in ("127.0.0.1", "localhost", "::1"):
-            print(f"WARNING: the API has no authentication and is reachable on {args.host}")
-        uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+        app = create_app(factory, scheduler, run_scheduler=run_scheduler, bot=bot,
+                         server={"host": host, "port": port})
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            print(f"WARNING: the API has no authentication and is reachable on {host}")
+        uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 def cmd_tray(factory, args):
     from .tray import main as tray_main
 
-    tray_main(factory, args.host, args.port, args.open)
+    host, port = server_address(factory, args)
+    tray_main(factory, host, port, args.open)
 
 
 def cmd_shortcut(factory, args):
@@ -238,12 +248,12 @@ def main(argv=None):
     p = commands.add_parser("run")
     p.add_argument("--once", action="store_true", help="one scan + one poll, then exit")
     p = commands.add_parser("serve")
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8964)
+    p.add_argument("--host", help="default: the server.host setting (127.0.0.1)")
+    p.add_argument("--port", type=int, help="default: the server.port setting (8964)")
     p.add_argument("--no-scheduler", action="store_true", help="UI/API only; a separate `run` does the work")
     p = commands.add_parser("tray")
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8964)
+    p.add_argument("--host", help="default: the server.host setting (127.0.0.1)")
+    p.add_argument("--port", type=int, help="default: the server.port setting (8964)")
     p.add_argument("--open", action="store_true", help="open the web UI once it is up")
     p = commands.add_parser("shortcut")
     p.add_argument("--startup", action="store_true", help="the login (autostart) shortcut instead")

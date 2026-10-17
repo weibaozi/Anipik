@@ -132,6 +132,7 @@ export interface Status {
   jobs: Partial<Record<JobPhase, number>>
   subscriptions: number
   db: string
+  server: { host?: string; port?: number; can_restart: boolean; addresses: string[] }
 }
 
 export interface Health {
@@ -182,6 +183,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   status: () => request<Status>('GET', '/status'),
   scan: () => request<{ requested: boolean }>('POST', '/scan'),
+  restartApp: () => request<{ restarting: boolean }>('POST', '/app/restart'),
 
   subscriptions: () => request<Subscription[]>('GET', '/subscriptions'),
   subscription: (id: number) => request<SubscriptionDetail>('GET', `/subscriptions/${id}`),

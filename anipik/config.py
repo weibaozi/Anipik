@@ -10,6 +10,9 @@ LEGACY_SETTING = ROOT / "old" / "setting.yaml"  # archived, gitignored; only `mi
 
 # Defaults for keys in the settings table; the table overrides them.
 DEFAULT_SETTINGS = {
+    # Web UI address; read at startup (serve / tray), so changes need a restart.
+    "server.host": "127.0.0.1",  # "0.0.0.0" = reachable from the LAN (no authentication!)
+    "server.port": 8964,
     "library_root": str(ROOT / "downloads"),
     "downloader": "pikpak_client",
     # exe_path empty = look in the default install locations; auto_start launches it with the port;

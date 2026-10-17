@@ -118,3 +118,21 @@ def test_status_and_scan_request(client):
     assert status["scheduler_in_process"] is False and status["downloader"] == "pikpak_client"
     assert client.post("/api/scan").json() == {"requested": True}
     assert client.get("/api/settings").status_code == 200
+
+
+def test_server_settings_and_restart(factory):
+    import time
+    restarts = []
+    with TestClient(create_app(factory, server={"host": "127.0.0.1", "port": 8964},
+                               on_restart=lambda: restarts.append(1))) as c:
+        assert c.get("/api/settings").json()["server.port"] == 8964
+        assert c.patch("/api/settings", json={"server.host": "0.0.0.0", "server.port": 9000}).status_code == 200
+        assert c.patch("/api/settings", json={"server.host": "everywhere"}).status_code == 422
+        assert c.patch("/api/settings", json={"server.port": 70000}).status_code == 422
+        server = c.get("/api/status").json()["server"]
+        assert server["port"] == 8964 and server["can_restart"] is True  # still the bound address
+        assert c.post("/api/app/restart").json() == {"restarting": True}
+        time.sleep(0.8)
+        assert restarts == [1]
+    with TestClient(create_app(factory)) as c:  # console mode: no restart hook
+        assert c.post("/api/app/restart").status_code == 409
