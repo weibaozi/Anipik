@@ -69,10 +69,30 @@ class FakeBridge:
                                "speed": 1, "size": f["size"], "downloaded": 1})
 
 
+class FakeLauncher:
+    """Stands in for launcher.py so tests never start or stop the real client."""
+    def __init__(self, exe="C:/PikPak/PikPak.exe", running=False):
+        self.exe, self.running, self.launched, self.stopped = exe, running, [], 0
+
+    def find_exe(self, configured=None):
+        return configured or self.exe
+
+    def running_pids(self, image="PikPak.exe"):
+        return [1] if self.running else []
+
+    def launch(self, exe, port):
+        self.launched.append((exe, port))
+        self.running = True
+
+    def stop(self, image="PikPak.exe"):
+        self.stopped += 1
+        self.running = False
+
+
 @pytest.fixture
 def env(tmp_path):
     bridge = FakeBridge()
-    downloader = PikPakClientDownloader({}, bridge_factory=lambda: bridge)
+    downloader = PikPakClientDownloader({}, bridge_factory=lambda: bridge, launcher=FakeLauncher())
     job = JobSpec(1, MAGNET, str(tmp_path / "Show"))
     state, checkpoints = {}, []
 
@@ -184,11 +204,50 @@ def test_expected_path_keeps_drive_letter():
         expected_path("N:/新番/Show", {"name": "x", "parents": [{"name": ".."}, {"name": ".."}]})
 
 
-def test_unreachable_client_is_transient():
-    class Down(FakeBridge):
-        def connect(self):
-            raise ConnectionRefusedError("refused")
-    downloader = PikPakClientDownloader({}, bridge_factory=Down)
-    with pytest.raises(TransientError):
+class Down(FakeBridge):
+    """Debug port closed: nothing answers."""
+    def connect(self):
+        raise ConnectionRefusedError("refused")
+
+    def version(self):
+        raise ConnectionRefusedError("refused")
+
+
+def test_unreachable_client_is_started_once():
+    launcher = FakeLauncher()
+    downloader = PikPakClientDownloader({"port": 19300}, bridge_factory=Down, launcher=launcher)
+    with pytest.raises(TransientError, match="已启动 PikPak"):
         with downloader.connection():
             pass
+    assert launcher.launched == [("C:/PikPak/PikPak.exe", 19300)]
+    launcher.running = False  # still starting / logging in: don't launch again during the cooldown
+    with pytest.raises(TransientError, match="正在启动"):
+        with downloader.connection():
+            pass
+    assert len(launcher.launched) == 1
+
+
+def test_running_without_debug_port_is_not_relaunched():
+    launcher = FakeLauncher(running=True)
+    downloader = PikPakClientDownloader({}, bridge_factory=Down, launcher=launcher)
+    assert "没有开启调试端口" in downloader.ensure_running()
+    assert launcher.launched == []
+    downloader.restart()  # only on an explicit request
+    assert launcher.stopped == 1 and len(launcher.launched) == 1
+
+
+def test_auto_start_off_and_missing_exe():
+    assert "未开启" in PikPakClientDownloader({"auto_start": False}, bridge_factory=Down,
+                                             launcher=FakeLauncher()).ensure_running()
+    missing = PikPakClientDownloader({}, bridge_factory=Down, launcher=FakeLauncher(exe=None))
+    assert "找不到 PikPak.exe" in missing.ensure_running()
+    assert missing.client_state() == {"exe": None, "auto_start": True, "process_running": False, "port_open": False}
+
+
+def test_running_client_needs_nothing():
+    class Up(FakeBridge):
+        def version(self):
+            return {"User-Agent": "PikPak/2.15"}
+    launcher = FakeLauncher(running=True)
+    assert PikPakClientDownloader({}, bridge_factory=Up, launcher=launcher).ensure_running() is None
+    assert launcher.launched == []

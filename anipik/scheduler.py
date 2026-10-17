@@ -276,6 +276,15 @@ class Scheduler:
         self.status["running"] = True
         last_scan = 0.0
         try:
+            with session_scope(self.factory) as session:
+                name = get_setting(session, "downloader")
+                downloader = self.downloader(session, name)
+            note = downloader.ensure_running()  # e.g. start the PikPak client with its debug port
+            if note:
+                log.info("%s: %s", name, note)
+        except Exception:
+            log.exception("could not prepare the downloader")
+        try:
             while not self._stop.is_set():
                 with session_scope(self.factory) as session:
                     settings = all_settings(session)

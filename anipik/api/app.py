@@ -402,12 +402,37 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
             scheduler.wake()
         return {k: v for k, v in values.items() if k in EDITABLE_SETTINGS}
 
-    @api.get("/downloader/health")
-    def downloader_health():
+    def current_downloader():
         with session_scope(factory) as session:
             settings = all_settings(session)
         name = settings["downloader"]
-        return {"downloader": name, **build_downloader(name, settings.get(f"downloader.{name}", {})).health()}
+        return name, build_downloader(name, settings.get(f"downloader.{name}", {}))
+
+    @api.get("/downloader/health")
+    def downloader_health():
+        name, downloader = current_downloader()
+        return {"downloader": name, **downloader.health()}
+
+    @api.post("/downloader/start")
+    def downloader_start():
+        """Start the backend if it isn't running (no-op when it already is)."""
+        _, downloader = current_downloader()
+        note = downloader.ensure_running()
+        wake()
+        return {"message": note or "已在运行"}
+
+    @api.post("/downloader/restart")
+    def downloader_restart():
+        """Exit and relaunch the client with its debug port; paused downloads resume on the next poll."""
+        _, downloader = current_downloader()
+        if not hasattr(downloader, "restart"):
+            raise HTTPException(422, "this downloader cannot be restarted")
+        try:
+            downloader.restart()
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        wake()
+        return {"message": "已重启，等待客户端登录"}
 
     # -- metadata ------------------------------------------------------------------
     @api.get("/bangumi/search")

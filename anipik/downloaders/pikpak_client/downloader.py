@@ -13,9 +13,11 @@ from pathlib import Path
 import websocket
 
 from ..base import Downloader, JobSpec, NeedsAttention, Status, TransientError
+from . import launcher as default_launcher
 from .bridge import BridgeError, PikPakBridge
 
 log = logging.getLogger(__name__)
+LAUNCH_COOLDOWN = 120  # seconds to give a freshly started client (startup + login) before trying again
 
 
 def expected_path(destination, file):
@@ -39,24 +41,73 @@ class PikPakClientDownloader(Downloader):
     name = "pikpak_client"
     accepts = frozenset({"magnet"})
 
-    def __init__(self, config, bridge_factory=None):
+    def __init__(self, config, bridge_factory=None, launcher=None):
         super().__init__(config)
         self.bridge_factory = bridge_factory or (lambda: PikPakBridge(
-            port=self.config.get("port", 19223),
-            modules=self.config.get("modules"), exports=self.config.get("exports")))
+            port=self.port, modules=self.config.get("modules"), exports=self.config.get("exports")))
+        self.launcher = launcher or default_launcher
         self.bridge = None
         self.instance = None  # id of the running client launch, refreshed every poll
+        self._last_launch = 0.0
+
+    @property
+    def port(self):
+        return int(self.config.get("port", 19223))
+
+    # -- client process --------------------------------------------------------------
+    def _exe(self):
+        return self.launcher.find_exe(self.config.get("exe_path") or None)
+
+    def _port_open(self):
+        try:
+            self.bridge_factory().version()
+            return True
+        except Exception:
+            return False
+
+    def client_state(self):
+        exe = self._exe()
+        return {"exe": exe, "auto_start": bool(self.config.get("auto_start", True)),
+                "process_running": bool(self.launcher.running_pids(os.path.basename(exe) if exe else "PikPak.exe")),
+                "port_open": self._port_open()}
+
+    def ensure_running(self):
+        """Start the client when it is not running. Returns why it can't be used yet, or None."""
+        if self._port_open():
+            return None
+        if not self.config.get("auto_start", True):
+            return "未开启自动启动 PikPak"
+        exe = self._exe()
+        if not exe:
+            return "找不到 PikPak.exe，请在设置页填写客户端路径"
+        if self.launcher.running_pids(os.path.basename(exe)):
+            return "PikPak 已在运行但没有开启调试端口：在设置页点「重启 PikPak」，或完全退出后由 anipik 启动"
+        if time.time() - self._last_launch < LAUNCH_COOLDOWN:
+            return "PikPak 正在启动，等待登录完成"
+        self.launcher.launch(exe, self.port)
+        self._last_launch = time.time()
+        return "已启动 PikPak，等待登录完成"
+
+    def restart(self):
+        """Exit the running client and start it again with the debug port (explicit request only)."""
+        exe = self._exe()
+        if not exe:
+            raise ValueError("找不到 PikPak.exe，请在设置页填写客户端路径")
+        self.launcher.stop(os.path.basename(exe))
+        self.launcher.launch(exe, self.port)
+        self._last_launch = time.time()
 
     def health(self):
         bridge = self.bridge_factory()
+        info = {"client": self.client_state()}
         try:
-            info = {"version": bridge.version().get("User-Agent", "")}
+            info["version"] = bridge.version().get("User-Agent", "")
             bridge.connect()
             info["modules"] = bridge.probe()
             info["ok"] = all(v is True for v in info["modules"].values())
             return info
         except _TRANSPORT_ERRORS as exc:
-            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+            return {**info, "ok": False, "error": f"{type(exc).__name__}: {exc}"}
         finally:
             bridge.close()
 
@@ -68,7 +119,8 @@ class PikPakClientDownloader(Downloader):
             self.instance = bridge.instance_id()
         except _TRANSPORT_ERRORS as exc:
             bridge.close()
-            raise TransientError(f"PikPak client unreachable: {exc}") from exc
+            hint = self.ensure_running()  # (re)start the client if it isn't running at all
+            raise TransientError(f"PikPak 客户端无法连接：{hint or exc}") from exc
         self.bridge = bridge
         try:
             yield self

@@ -41,6 +41,10 @@ class Downloader:
     def health(self) -> dict:
         raise NotImplementedError
 
+    def ensure_running(self):
+        """Start the backend if it can be started locally. Returns why it is unusable, or None."""
+        return None
+
     @contextmanager
     def connection(self):
         """Opened once per poll around all advance() calls. Raise TransientError if unreachable."""

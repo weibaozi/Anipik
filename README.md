@@ -23,15 +23,11 @@ cd anipik\web && npm install && npm run build
 
 ## 使用
 
-1. 完全退出 PikPak，再以调试端口启动并登录（只监听本机）：
-
-   ```
-   "C:\Program Files\PikPak\PikPak.exe" --remote-debugging-port=19223 --remote-debugging-address=127.0.0.1
-   ```
-
-2. 双击 **run anipik.bat**（首次会自动构建前端），打开 http://127.0.0.1:8964
-3. 在「来源」添加 RSS 站点（内置常用站点预设），在「订阅」新建订阅
-4. （可选）在 `setting.yaml` 填写 `discord_token`，启动 **run dcbot.bat**，并在设置页开启 Discord 通知
+1. 先完全退出 PikPak（包括托盘），然后双击 **run anipik.bat**（首次会自动构建前端），打开 http://127.0.0.1:8964。
+   anipik 会自动以调试端口（只监听本机）启动 PikPak；首次需要在客户端里登录。
+   客户端路径、端口和自动启动在「设置」页修改；如果 PikPak 已经以普通方式运行，在设置页点「重启 PikPak」。
+2. 在「来源」添加 RSS 站点（内置常用站点预设），在「订阅」新建订阅
+3. （可选）在 `setting.yaml` 填写 `discord_token`，启动 **run dcbot.bat**，并在设置页开启 Discord 通知
 
 数据保存在 `data/anipik.db`（SQLite）。API 没有认证，默认只监听 127.0.0.1。
 

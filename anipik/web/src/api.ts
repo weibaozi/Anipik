@@ -139,6 +139,7 @@ export interface Health {
   version?: string
   modules?: Record<string, boolean | string>
   error?: string
+  client?: { exe: string | null; auto_start: boolean; process_running: boolean; port_open: boolean }
 }
 
 export type Settings = Record<string, any>
@@ -203,6 +204,8 @@ export const api = {
   settings: () => request<Settings>('GET', '/settings'),
   updateSettings: (body: Settings) => request<Settings>('PATCH', '/settings', body),
   health: () => request<Health>('GET', '/downloader/health'),
+  startDownloader: () => request<{ message: string }>('POST', '/downloader/start'),
+  restartDownloader: () => request<{ message: string }>('POST', '/downloader/restart'),
 
   bangumiSearch: (q: string) => request<BangumiItem[]>('GET', `/bangumi/search?q=${encodeURIComponent(q)}`),
   bangumiSubject: (id: number) => request<BangumiItem>('GET', `/bangumi/subject/${id}`),
