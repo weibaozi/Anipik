@@ -144,6 +144,16 @@ export interface Health {
 
 export type Settings = Record<string, any>
 
+export interface DiscordStatus {
+  status: { state: string; user: string | null; error: string | null; commands?: boolean; since?: string | null }
+  outbox: {
+    pending: number
+    failed: { message: string; error: string | null }[]
+    last: { message: string; sent: boolean; error: string | null; attempts: number } | null
+  }
+  legacy_token: boolean
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -206,6 +216,8 @@ export const api = {
   health: () => request<Health>('GET', '/downloader/health'),
   startDownloader: () => request<{ message: string }>('POST', '/downloader/start'),
   restartDownloader: () => request<{ message: string }>('POST', '/downloader/restart'),
+  discordStatus: () => request<DiscordStatus>('GET', '/notify/discord'),
+  discordTest: () => request<{ queued: boolean }>('POST', '/notify/discord/test'),
 
   bangumiSearch: (q: string) => request<BangumiItem[]>('GET', `/bangumi/search?q=${encodeURIComponent(q)}`),
   bangumiSubject: (id: number) => request<BangumiItem>('GET', `/bangumi/subject/${id}`),

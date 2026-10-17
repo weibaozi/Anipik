@@ -1,23 +1,25 @@
-"""Notifications. For now: hand messages to the existing Discord bot via its YAML queue."""
+"""Notifications: written to the notifications outbox table, delivered by the Discord bot thread."""
 import logging
+
+from .db import session_scope
+from .models import Notification
 
 log = logging.getLogger(__name__)
 
 
-class DiscordQueueNotifier:
-    def __init__(self, ids):
-        self.setting = {"discord_id": {"user_id": list(ids.get("user_id") or []),
-                                       "channel_id": list(ids.get("channel_id") or [])}}
+class OutboxNotifier:
+    def __init__(self, factory, channel="discord"):
+        self.factory, self.channel = factory, channel
 
     def send(self, message):
-        from chatbot.notify import notify_discord  # writes chatbot/notify_queue.yaml for the bot
-        notify_discord(message, self.setting)
+        with session_scope(self.factory) as session:
+            session.add(Notification(channel=self.channel, message=message))
 
 
-def build_notifiers(settings):
+def build_notifiers(settings, factory):
     notifiers = []
     if settings.get("notify.discord.enabled"):
-        notifiers.append(DiscordQueueNotifier(settings.get("notify.discord.ids") or {}))
+        notifiers.append(OutboxNotifier(factory, "discord"))
     return notifiers
 
 

@@ -1,4 +1,4 @@
-﻿# Anipik
+# Anipik
 
 追番自动下载：按订阅定时搜索 RSS 站点，识别新集数，交给下载器（目前是 PikPak 官方客户端）下载到本地媒体库，带 Web 管理界面和 Discord 通知。
 
@@ -9,7 +9,7 @@
 - bgm.tv 封面、开播日期、总集数；可按季度归档（如 `26年10月/番名`）
 - 下载器可插拔；PikPak 客户端通过本机调试端口调用官方模块，云端下载完成后直接下载到本地
 - 每一步有检查点，崩溃 / 重启后自动续上，结果不确定时进入「需要处理」而不是盲目重试
-- Discord 通知（复用 `chatbot/discordbot`）
+- 内置 Discord 机器人：随 anipik 启动，下载完成 / 失败 / 需要处理时通知；支持 `!status` `!scan` 命令
 
 ## 安装
 
@@ -27,7 +27,8 @@ cd anipik\web && npm install && npm run build
    anipik 会自动以调试端口（只监听本机）启动 PikPak；首次需要在客户端里登录。
    客户端路径、端口和自动启动在「设置」页修改；如果 PikPak 已经以普通方式运行，在设置页点「重启 PikPak」。
 2. 在「来源」添加 RSS 站点（内置常用站点预设），在「订阅」新建订阅
-3. （可选）在 `setting.yaml` 填写 `discord_token`，启动 **run dcbot.bat**，并在设置页开启 Discord 通知
+3. （可选）在设置页开启 Discord 通知，填写 bot token 和要通知的用户 / 频道 ID；机器人随 anipik 一起启动。
+   未填写 token 时会使用 `setting.yaml` 里旧的 `discord_token`。命令需要在 Developer Portal 开启 Message Content intent
 
 数据保存在 `data/anipik.db`（SQLite）。API 没有认证，默认只监听 127.0.0.1。
 

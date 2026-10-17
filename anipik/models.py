@@ -91,6 +91,18 @@ class Episode(Base):
     jobs: Mapped[list["Job"]] = relationship(back_populates="episode", order_by="Job.id")
 
 
+class Notification(Base):
+    """Outbox: written by the scheduler, delivered by the in-process bot (survives restarts)."""
+    __tablename__ = "notifications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel: Mapped[str] = mapped_column(String, default="discord", index=True)
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=now)
+    sent_at: Mapped[Optional[datetime]]
+    attempts: Mapped[int] = mapped_column(default=0)
+    error: Mapped[Optional[str]] = mapped_column(Text)
+
+
 class Job(Base):
     __tablename__ = "jobs"
     id: Mapped[int] = mapped_column(primary_key=True)

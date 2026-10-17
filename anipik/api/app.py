@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 
-from .. import bangumi, config
+from .. import bangumi, config, discord_bot
 from ..config import DEFAULT_SETTINGS
 from ..db import all_settings, session_scope, set_setting
 from ..downloaders import DOWNLOADERS, build_downloader
@@ -95,10 +95,21 @@ def source_out(source, binding_count=0):
 
 
 # -- app -----------------------------------------------------------------------------
-def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
-    """scheduler: shared Scheduler (for status / scan requests). run_scheduler: run its loop in a thread."""
+def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None):
+    """scheduler: shared Scheduler (for status / scan requests). run_scheduler: run its loop in a thread.
+    bot: DiscordBot to run in this process (only where the scheduler runs, so messages go out once)."""
     http = Http(retries=1, timeout=20)
     thread_holder = {}
+
+    def request_scan():
+        if scheduler is not None and run_scheduler:
+            scheduler.request_scan()
+        else:
+            with session_scope(factory) as session:  # picked up by a scheduler in another process
+                set_setting(session, "scan_requested", True)
+
+    if bot is not None and bot.on_scan is None:
+        bot.on_scan = request_scan
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -106,7 +117,11 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
             thread = threading.Thread(target=scheduler.run, kwargs={"sync": sync}, name="scheduler", daemon=True)
             thread.start()
             thread_holder["thread"] = thread
+        if bot is not None:
+            bot.apply()
         yield
+        if bot is not None:
+            bot.stop()
         if "thread" in thread_holder:
             scheduler.stop()
             thread_holder["thread"].join(timeout=10)
@@ -137,11 +152,7 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
 
     @api.post("/scan")
     def scan_now():
-        if scheduler is not None and run_scheduler:
-            scheduler.request_scan()
-        else:
-            with session_scope(factory) as session:  # picked up by a scheduler in another process
-                set_setting(session, "scan_requested", True)
+        request_scan()
         return {"requested": True}
 
     # -- subscriptions -------------------------------------------------------------
@@ -374,14 +385,24 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
         return result
 
     # -- settings / backend --------------------------------------------------------
+    def public_settings(values):
+        out = {k: v for k, v in values.items() if k in EDITABLE_SETTINGS}
+        # Never echo the bot token; the form sends "" to keep it unchanged.
+        out["notify.discord.token_set"] = bool(out.get("notify.discord.token"))
+        out["notify.discord.token"] = ""
+        return out
+
     @api.get("/settings")
     def get_settings():
         with session_scope(factory) as session:
             values = all_settings(session)
-        return {k: v for k, v in values.items() if k in EDITABLE_SETTINGS}
+        return public_settings(values)
 
     @api.patch("/settings")
     def patch_settings(body: dict):
+        body.pop("notify.discord.token_set", None)
+        if body.get("notify.discord.token") == "":
+            body.pop("notify.discord.token")
         unknown = sorted(set(body) - EDITABLE_SETTINGS)
         if unknown:
             raise HTTPException(422, f"unknown settings: {unknown}")
@@ -400,7 +421,9 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
         if scheduler is not None:
             scheduler.reload_downloaders()
             scheduler.wake()
-        return {k: v for k, v in values.items() if k in EDITABLE_SETTINGS}
+        if bot is not None:
+            bot.apply(values)
+        return public_settings(values)
 
     def current_downloader():
         with session_scope(factory) as session:
@@ -433,6 +456,18 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None):
             raise HTTPException(422, str(exc))
         wake()
         return {"message": "已重启，等待客户端登录"}
+
+    # -- discord bot ---------------------------------------------------------------
+    @api.get("/notify/discord")
+    def discord_status():
+        status = dict(bot.status) if bot is not None else {"state": "not_in_process", "user": None, "error": None}
+        return {"status": status, "outbox": discord_bot.outbox_summary(factory),
+                "legacy_token": bool(discord_bot.legacy_token())}
+
+    @api.post("/notify/discord/test")
+    def discord_test():
+        discord_bot.enqueue_test(factory)
+        return {"queued": True}
 
     # -- metadata ------------------------------------------------------------------
     @api.get("/bangumi/search")

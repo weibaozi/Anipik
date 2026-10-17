@@ -1,9 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { NAlert, NButton, NCard, NInput, NInputNumber, NSpin, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
-import { api, type Health, type Settings } from '../api'
+import {
+  NAlert,
+  NButton,
+  NCard,
+  NDynamicTags,
+  NInput,
+  NInputNumber,
+  NSpin,
+  NSwitch,
+  NTag,
+  useDialog,
+  useMessage,
+} from 'naive-ui'
+import { api, type DiscordStatus, type Health, type Settings } from '../api'
 import { status } from '../store'
-import { errorText } from '../util'
+import { errorText, usePolling } from '../util'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -18,12 +30,17 @@ onMounted(async () => {
     const loaded = await api.settings()
     // Older saved values may lack newer keys; fill them so the form and change detection agree.
     loaded['downloader.pikpak_client'] = {
-    port: 19223,
-    exe_path: '',
-    auto_start: true,
-    start_hidden: true,
-    ...loaded['downloader.pikpak_client'],
-  }
+      port: 19223,
+      exe_path: '',
+      auto_start: true,
+      start_hidden: true,
+      ...loaded['downloader.pikpak_client'],
+    }
+    const ids = loaded['notify.discord.ids'] ?? {}
+    loaded['notify.discord.ids'] = {
+      user_id: (ids.user_id ?? []).map(String),
+      channel_id: (ids.channel_id ?? []).map(String),
+    }
     settings.value = loaded
     original.value = JSON.stringify(settings.value)
   } catch (error) {
@@ -72,6 +89,38 @@ const moduleLabels: Record<string, string> = {
   download_action: '下载到本地',
   download_kernel: '下载内核（主窗口）',
 }
+// --- discord bot
+const discord = ref<DiscordStatus | null>(null)
+usePolling(async () => {
+  try {
+    discord.value = await api.discordStatus()
+  } catch {
+    /* shown as unknown */
+  }
+}, 3000)
+const botStates: Record<string, { label: string; type: 'success' | 'warning' | 'error' | 'default' | 'info' }> = {
+  connected: { label: '已连接', type: 'success' },
+  starting: { label: '连接中…', type: 'info' },
+  reconnecting: { label: '重连中…', type: 'warning' },
+  disabled: { label: '未启用', type: 'default' },
+  no_token: { label: '缺少 token', type: 'warning' },
+  error: { label: '出错', type: 'error' },
+  stopped: { label: '已停止', type: 'default' },
+  not_in_process: { label: '由独立调度进程运行', type: 'default' },
+}
+const testing = ref(false)
+async function sendTest() {
+  testing.value = true
+  try {
+    await api.discordTest()
+    message.success('测试消息已加入发送队列')
+  } catch (error) {
+    message.error(errorText(error))
+  } finally {
+    testing.value = false
+  }
+}
+
 const pikpak = () =>
   settings.value!['downloader.pikpak_client'] as { port: number; exe_path: string; auto_start: boolean; start_hidden: boolean }
 
@@ -195,12 +244,48 @@ function restartClient() {
         </div>
       </n-card>
 
-      <n-card title="通知 · Discord" size="small" class="section">
-        <div class="form-grid">
-          <label>启用</label>
-          <n-switch v-model:value="settings['notify.discord.enabled']" />
+      <n-card title="通知 · Discord 机器人" size="small" class="section">
+        <template #header-extra>
+          <n-button size="small" :loading="testing" :disabled="discord?.status.state !== 'connected'" @click="sendTest">发送测试消息</n-button>
+        </template>
+        <div v-if="discord" class="client">
+          <n-tag size="small" round :type="(botStates[discord.status.state] ?? botStates.stopped).type">
+            {{ (botStates[discord.status.state] ?? { label: discord.status.state }).label }}
+          </n-tag>
+          <span v-if="discord.status.user">{{ discord.status.user }}</span>
+          <span v-if="discord.status.state === 'connected' && discord.status.commands === false" class="muted">
+            未开启 Message Content intent，命令不可用（通知正常）
+          </span>
+          <span class="muted">待发送 {{ discord.outbox.pending }}</span>
         </div>
-        <div class="muted small" style="margin-top: 8px">消息写入 Discord 机器人的队列（chatbot/notify_queue.yaml），机器人需单独运行。</div>
+        <n-alert v-if="discord?.status.error" type="error" :show-icon="false" style="margin-top: 10px">{{ discord.status.error }}</n-alert>
+        <n-alert v-if="discord?.outbox.last?.error" type="warning" :show-icon="false" style="margin-top: 10px">
+          最近一条未送达：{{ discord.outbox.last.error }}
+        </n-alert>
+        <div class="form-grid" style="margin-top: 14px">
+          <label>启用</label>
+          <div>
+            <n-switch v-model:value="settings['notify.discord.enabled']" />
+            <div class="muted small">随 anipik 一起启动；下载完成 / 失败 / 需要处理时发消息</div>
+          </div>
+          <label>Bot token</label>
+          <div>
+            <n-input
+              v-model:value="settings['notify.discord.token']"
+              type="password"
+              show-password-on="click"
+              :placeholder="settings['notify.discord.token_set'] ? '已设置（留空保持不变）' : discord?.legacy_token ? '使用 setting.yaml 中的 discord_token' : '粘贴 Discord bot token'"
+            />
+          </div>
+          <label>用户 ID</label>
+          <div>
+            <n-dynamic-tags v-model:value="settings['notify.discord.ids'].user_id" />
+            <div class="muted small">私信给这些用户（开发者模式下右键用户 → 复制用户 ID）</div>
+          </div>
+          <label>频道 ID</label>
+          <n-dynamic-tags v-model:value="settings['notify.discord.ids'].channel_id" />
+        </div>
+        <div class="muted small" style="margin-top: 10px">命令：!status 下载状态 · !scan 立即扫描 · !help</div>
       </n-card>
 
       <div class="footer">

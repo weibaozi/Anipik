@@ -22,5 +22,6 @@ DEFAULT_SETTINGS = {
     # A job that keeps failing to reach the downloader is parked after this many ticks.
     "max_transient_errors": 120,
     "notify.discord.enabled": False,
+    "notify.discord.token": "",  # empty: fall back to discord_token in setting.yaml
     "notify.discord.ids": {"user_id": [], "channel_id": []},
 }

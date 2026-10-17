@@ -82,25 +82,36 @@ def cmd_scan(factory, args):
 
 
 def cmd_run(factory, args):
+    from .discord_bot import DiscordBot
+
     with single_instance(lock_path()) as acquired:
         if not acquired:
             sys.exit("Another scheduler is already running for this database")
+        scheduler = Scheduler(factory)
+        bot = DiscordBot(factory, on_scan=scheduler.request_scan)
+        bot.apply()  # starts when notify.discord is enabled and a token is configured
         try:
-            Scheduler(factory).run(once=args.once)
+            scheduler.run(once=args.once)
         except KeyboardInterrupt:
             print("Stopped. Downloads already handed to the backend continue; rerun to resume.")
+        finally:
+            bot.stop()
 
 
 def cmd_serve(factory, args):
     import uvicorn
 
     from .api import create_app
+    from .discord_bot import DiscordBot
 
     with single_instance(lock_path()) as acquired:
         run_scheduler = acquired and not args.no_scheduler
         if not acquired and not args.no_scheduler:
             print("Another scheduler holds the lock; serving the UI only (scans are handed to it).")
-        app = create_app(factory, Scheduler(factory), run_scheduler=run_scheduler)
+        scheduler = Scheduler(factory)
+        # The bot lives with the scheduler so each notification is delivered by one process only.
+        bot = DiscordBot(factory, on_scan=scheduler.request_scan) if run_scheduler else None
+        app = create_app(factory, scheduler, run_scheduler=run_scheduler, bot=bot)
         if args.host not in ("127.0.0.1", "localhost", "::1"):
             print(f"WARNING: the API has no authentication and is reachable on {args.host}")
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")

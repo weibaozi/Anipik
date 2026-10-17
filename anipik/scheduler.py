@@ -48,6 +48,7 @@ class Scheduler:
         self._injected = dict(downloaders or {})  # name -> instance (tests); others built from settings
         self._downloaders = dict(self._injected)
         self._notifiers = notifiers
+        self._outgoing = []  # (notifiers, message) sent after the poll transaction commits
         self._wake = threading.Event()
         self._scan_requested = threading.Event()
         self._stop = threading.Event()
@@ -66,7 +67,12 @@ class Scheduler:
         self._downloaders = dict(self._injected)
 
     def notifiers(self, settings):
-        return self._notifiers if self._notifiers is not None else build_notifiers(settings)
+        return self._notifiers if self._notifiers is not None else build_notifiers(settings, self.factory)
+
+    def _flush_notifications(self):
+        outgoing, self._outgoing = self._outgoing, []
+        for notifiers, message in outgoing:
+            notify(notifiers, message)
 
     def resolve_magnet(self, release):
         if release.url.startswith("magnet:?"):
@@ -157,6 +163,14 @@ class Scheduler:
     # -- poll --------------------------------------------------------------------
     def poll(self):
         """Promote pending jobs into free slots, then advance every running job once."""
+        try:
+            self._poll()
+        finally:
+            # Outbox writes need their own transaction; doing them inside the poll session
+            # would wait on the write lock this same thread holds.
+            self._flush_notifications()
+
+    def _poll(self):
         with session_scope(self.factory) as session:
             settings = all_settings(session)
             jobs = session.scalars(select(Job).where(Job.phase.in_(ACTIVE_PHASES)).order_by(Job.id)).all()
@@ -240,7 +254,7 @@ class Scheduler:
             message = f"下载失败: {label}: {error}"
         else:
             message = f"需要处理: {label}: {error}"
-        notify(self.notifiers(settings), message)
+        self._outgoing.append((self.notifiers(settings), message))
 
     # -- loop --------------------------------------------------------------------
     def request_scan(self):
