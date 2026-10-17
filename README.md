@@ -28,7 +28,9 @@ cd anipik\web && npm install && npm run build
    客户端路径、端口和自动启动在「设置」页修改；如果 PikPak 已经以普通方式运行，在设置页点「重启 PikPak」。
 2. 在「来源」添加 RSS 站点（内置常用站点预设），在「订阅」新建订阅
 3. （可选）在设置页开启 Discord 通知，填写 bot token 和要通知的用户 / 频道 ID；机器人随 anipik 一起启动。
-   未填写 token 时会使用 `setting.yaml` 里旧的 `discord_token`。命令需要在 Developer Portal 开启 Message Content intent
+   命令需要在 Developer Portal 开启 Message Content intent
+
+所有配置（媒体库目录、PikPak、调度、Discord）都在设置页里，保存在数据库中，没有配置文件。
 
 数据保存在 `data/anipik.db`（SQLite）。API 没有认证，默认只监听 127.0.0.1。
 
@@ -45,7 +47,7 @@ cd anipik\web && npm install && npm run build
 | `scan --dry-run` | 预览这次扫描会下载什么，不提交任何任务 |
 | `status` / `probe` | 订阅和任务概况 / 检测下载器连接 |
 | `retry JOB` / `mark SUB EP...` | 处理卡住的任务 / 手动标记集数 |
-| `migrate` | 从旧版 `old/anime_rss.yaml` 和 `setting.yaml` 导入（可重复执行） |
+| `migrate` | 从旧版 `old/anime_rss.yaml` 和 `old/setting.yaml` 导入（可重复执行） |
 
 ## 开发
 

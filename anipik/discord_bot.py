@@ -1,17 +1,15 @@
 """Built-in Discord bot: delivers the notifications outbox and answers a few commands.
 
 Runs discord.py in its own thread and event loop inside the anipik process. Config comes
-from settings (notify.discord.*); the token falls back to discord_token in setting.yaml.
+from settings (notify.discord.*).
 """
 import asyncio
 import logging
 import threading
 from datetime import datetime, timedelta
 
-import yaml
 from sqlalchemy import func, select
 
-from . import config
 from .db import all_settings, session_scope
 from .models import Job, Notification
 
@@ -20,22 +18,11 @@ MAX_ATTEMPTS = 5
 DELIVERY_INTERVAL = 3  # seconds between outbox checks
 
 
-def legacy_token():
-    try:
-        with open(config.LEGACY_SETTING, encoding="utf-8") as f:
-            token = (yaml.safe_load(f) or {}).get("discord_token")
-    except OSError:
-        return ""
-    token = str(token).strip() if token else ""  # an unquoted placeholder parses as int
-    # Real bot tokens are ~70 characters; anything short is a placeholder left in the old config.
-    return token if len(token) >= 50 else ""
-
-
 def bot_config(settings):
     """(token, user ids, channel ids) when the bot should run, else None."""
     if not settings.get("notify.discord.enabled"):
         return None
-    token = str(settings.get("notify.discord.token") or "").strip() or legacy_token()
+    token = str(settings.get("notify.discord.token") or "").strip()
     if not token:
         return None
     ids = settings.get("notify.discord.ids") or {}

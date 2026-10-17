@@ -4,7 +4,6 @@ import time
 import pytest
 from sqlalchemy import select
 
-from anipik import discord_bot
 from anipik.db import all_settings, session_scope, set_setting
 from anipik.discord_bot import MAX_ATTEMPTS, DiscordBot, bot_config, deliver_pending
 from anipik.downloaders import Status
@@ -83,31 +82,16 @@ def test_scheduler_writes_outbox_after_its_transaction(factory, tmp_path):
     assert rows(factory) == [("完成下载: Show 第3集", False, 0, None)]
 
 
-def test_bot_config_and_states(factory, monkeypatch):
-    monkeypatch.setattr(discord_bot, "legacy_token", lambda: "")
+def test_bot_config_and_states(factory):
     assert bot_config({"notify.discord.enabled": False, "notify.discord.token": "t"}) is None
     assert bot_config({"notify.discord.enabled": True, "notify.discord.token": ""}) is None
     assert bot_config({"notify.discord.enabled": True, "notify.discord.token": "t",
                        "notify.discord.ids": {"user_id": ["1", " "], "channel_id": [2]}}) == ("t", ("1",), ("2",))
-    monkeypatch.setattr(discord_bot, "legacy_token", lambda: "from-yaml")
-    assert bot_config({"notify.discord.enabled": True, "notify.discord.token": ""})[0] == "from-yaml"
-    monkeypatch.undo()
 
     bot = DiscordBot(factory)
     with session_scope(factory) as s:
         bot.apply(all_settings(s))  # disabled by default: no thread, no network
     assert bot.status["state"] == "disabled" and bot._thread is None
-
-
-def test_legacy_placeholder_token_is_ignored(tmp_path, monkeypatch):
-    from anipik import config
-    legacy = tmp_path / "setting.yaml"
-    monkeypatch.setattr(config, "LEGACY_SETTING", legacy)
-    legacy.write_text("discord_token: 123", encoding="utf-8")  # unquoted: parses as int
-    assert discord_bot.legacy_token() == ""
-    real = "M" + "x" * 23 + "." + "y" * 6 + "." + "z" * 38
-    legacy.write_text(f"discord_token: {real}", encoding="utf-8")
-    assert discord_bot.legacy_token() == real
 
 
 def test_api_never_returns_the_token(factory):

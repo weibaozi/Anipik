@@ -6,6 +6,7 @@
 - `utils/`：旧 RSS 解析、PikPak API 封装
 - `anime_rss.yaml`：旧订阅规则（已通过 `python -m anipik migrate` 导入数据库；`migrate` 默认仍读取这里）
 - `requirements.txt`：旧依赖（含冲突的重复版本）
+- `setting.yaml`（仅本地，已从 git 移除并忽略）：旧配置，含 PikPak 账号密码明文。设置已导入数据库，确认不再需要后可以删除
 - `chatbot/`、`run dcbot.bat`：旧的独立 Discord 机器人（通过 notify_queue.yaml 收消息），已内置到 anipik
 
 这些文件移动后路径已变化（例如 `main.py` 按自身目录查找 `setting.yaml`），无法直接在这里运行。

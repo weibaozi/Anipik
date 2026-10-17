@@ -6,7 +6,7 @@ DATA_DIR = Path(os.environ.get("ANIPIK_DATA", ROOT / "data"))
 DB_PATH = Path(os.environ.get("ANIPIK_DB", DATA_DIR / "anipik.db"))
 
 LEGACY_RSS = ROOT / "old" / "anime_rss.yaml"  # archived; already imported by `migrate`
-LEGACY_SETTING = ROOT / "setting.yaml"
+LEGACY_SETTING = ROOT / "old" / "setting.yaml"  # archived, gitignored; only `migrate` reads it
 
 # Defaults for keys in the settings table; the table overrides them.
 DEFAULT_SETTINGS = {
@@ -22,6 +22,6 @@ DEFAULT_SETTINGS = {
     # A job that keeps failing to reach the downloader is parked after this many ticks.
     "max_transient_errors": 120,
     "notify.discord.enabled": False,
-    "notify.discord.token": "",  # empty: fall back to discord_token in setting.yaml
+    "notify.discord.token": "",  # never returned by the API
     "notify.discord.ids": {"user_id": [], "channel_id": []},
 }

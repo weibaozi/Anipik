@@ -17,8 +17,9 @@ LEGACY = {
                             "enable": False}}},
     "Empty": {"addon": "x", "expr": "+", "rss_link": "y", "suffix": "", "tasks": {}},
 }
+REAL_TOKEN = "M" + "x" * 23 + "." + "y" * 6 + "." + "z" * 38
 SETTING = {"location": "N:/新番", "discord": True, "discord_id": {"user_id": ["1"], "channel_id": ["2"]},
-           "pikpak_password": "secret", "discord_token": "secret"}
+           "pikpak_password": "secret", "discord_token": REAL_TOKEN}
 
 
 def write(tmp_path):
@@ -45,7 +46,8 @@ def test_migrate_merges_sources_and_is_idempotent(factory, tmp_path):
         assert not s.scalar(select(Subscription).where(Subscription.name == "Show B")).enabled
         settings = all_settings(s)
         assert settings["library_root"] == "N:/新番" and settings["notify.discord.enabled"] is True
-        assert "secret" not in str(settings)
+        assert "secret" not in str(settings)  # the unused PikPak password is not imported
+        assert settings["notify.discord.token"] == REAL_TOKEN
         # an episode that later failed must not be reset by a re-import
         s.scalar(select(Episode).where(Episode.number == 1)).status = "failed"
 
@@ -55,3 +57,10 @@ def test_migrate_merges_sources_and_is_idempotent(factory, tmp_path):
     with session_scope(factory) as s:
         assert s.scalar(select(Episode).where(Episode.number == 1)).status == "failed"
         assert len(s.scalars(select(Source)).all()) == 3
+
+
+def test_migrate_ignores_placeholder_token(factory, tmp_path):
+    rss, setting = write(tmp_path)
+    setting.write_text("discord_token: 123\n", encoding="utf-8")  # unquoted placeholder parses as int
+    with session_scope(factory) as s:
+        assert "notify.discord.token" not in migrate(s, rss, setting)["settings"]

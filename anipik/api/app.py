@@ -461,8 +461,7 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None
     @api.get("/notify/discord")
     def discord_status():
         status = dict(bot.status) if bot is not None else {"state": "not_in_process", "user": None, "error": None}
-        return {"status": status, "outbox": discord_bot.outbox_summary(factory),
-                "legacy_token": bool(discord_bot.legacy_token())}
+        return {"status": status, "outbox": discord_bot.outbox_summary(factory)}
 
     @api.post("/notify/discord/test")
     def discord_test():

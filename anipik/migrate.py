@@ -1,9 +1,9 @@
-"""Import legacy anime_rss.yaml / setting.yaml into the database.
+"""Import the legacy anime_rss.yaml / setting.yaml (now under old/) into the database.
 
-Idempotent upsert, so it can be re-run (or run on every scan with --sync-yaml)
-while the old streamlit page is still the editor. It never deletes rows and never
-downgrades an episode that already exists. Secrets (PikPak password, Discord token)
-are not imported.
+Idempotent upsert: it can be re-run, never deletes rows and never downgrades an episode
+that already exists. Everything is configured in the settings table afterwards; the
+YAML files are not read at runtime. The PikPak password is not imported (unused); a
+Discord bot token is, unless it is an obvious placeholder.
 """
 import logging
 from pathlib import Path
@@ -47,6 +47,10 @@ def import_settings(session, setting_path):
     if "discord" in legacy:
         set_setting(session, "notify.discord.enabled", bool(legacy["discord"]))
         imported.append("notify.discord.enabled")
+    token = str(legacy.get("discord_token") or "").strip()  # unquoted placeholders parse as int
+    if len(token) >= 50:  # real bot tokens are ~70 characters
+        set_setting(session, "notify.discord.token", token)
+        imported.append("notify.discord.token")
     if legacy.get("discord_id"):
         ids = legacy["discord_id"]
         set_setting(session, "notify.discord.ids",

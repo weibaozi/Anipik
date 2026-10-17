@@ -274,7 +274,7 @@ function restartClient() {
               v-model:value="settings['notify.discord.token']"
               type="password"
               show-password-on="click"
-              :placeholder="settings['notify.discord.token_set'] ? '已设置（留空保持不变）' : discord?.legacy_token ? '使用 setting.yaml 中的 discord_token' : '粘贴 Discord bot token'"
+              :placeholder="settings['notify.discord.token_set'] ? '已设置（留空保持不变）' : '粘贴 Discord bot token'"
             />
           </div>
           <label>用户 ID</label>

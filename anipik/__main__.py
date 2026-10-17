@@ -1,6 +1,6 @@
 """python -m anipik <command>
 
-  migrate            import old/anime_rss.yaml + setting.yaml into data/anipik.db (re-runnable)
+  migrate            import the legacy old/anime_rss.yaml + old/setting.yaml (re-runnable)
   scan [--dry-run]   search sources now and queue new episodes
   serve              web UI + API on http://127.0.0.1:8964, with the scheduler in-process
   run                scheduler loop only (scan every scan_interval, poll every poll_interval)

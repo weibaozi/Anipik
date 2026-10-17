@@ -151,7 +151,6 @@ export interface DiscordStatus {
     failed: { message: string; error: string | null }[]
     last: { message: string; sent: boolean; error: string | null; attempts: number } | null
   }
-  legacy_token: boolean
 }
 
 export class ApiError extends Error {
