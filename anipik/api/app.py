@@ -549,5 +549,7 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None
             file = (WEB_DIST / path).resolve()
             if path and file.is_file() and file.is_relative_to(WEB_DIST):
                 return FileResponse(file)
-            return FileResponse(WEB_DIST / "index.html")
+            # Always revalidate the page itself, so a rebuilt UI shows up without a hard refresh
+            # (its /assets files are content-hashed and can be cached).
+            return FileResponse(WEB_DIST / "index.html", headers={"Cache-Control": "no-cache"})
     return app

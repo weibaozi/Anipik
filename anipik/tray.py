@@ -60,6 +60,8 @@ class TrayApp:
                 log.info("anipik is already running; opening its web UI")
                 webbrowser.open(self.url)
                 return False
+            from .webbuild import ensure_built
+            ensure_built()  # dist is not in git: rebuild it after a pull changed the UI sources
             self._start_server()
             self.icon = pystray.Icon("anipik", Image.open(ICON_IMAGE), "Anipik", menu=self._menu())
             threading.Thread(target=self._watch, name="tray-status", daemon=True).start()

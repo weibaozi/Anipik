@@ -13,13 +13,10 @@
 
 ## 安装
 
-需要 Python 3.11+ 和 Node.js 18+。
+需要 Python 3.11+ 和 Node.js 18+。双击 **run anipik.bat** 即可：首次会创建 `.venv` 并安装依赖，启动时自动构建网页。
 
-```
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-cd anipik\web && npm install && npm run build
-```
+**更新**：`git pull` 之后照常双击 run anipik.bat（先在托盘里退出旧的）。它会安装新增的 Python 依赖，
+并在网页源码有变化时自动重新构建 `anipik/web/dist`（这个目录不在 git 里），不需要手动 `npm run build`。
 
 ## 使用
 

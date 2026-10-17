@@ -84,7 +84,9 @@ def cmd_serve(factory, args):
 
     from .api import create_app
     from .discord_bot import DiscordBot
+    from .webbuild import ensure_built
 
+    ensure_built()  # dist is not in git: rebuild it after a pull changed the UI sources
     host, port = server_address(factory, args)
     with single_instance(lock_path()) as acquired:
         run_scheduler = acquired and not args.no_scheduler
