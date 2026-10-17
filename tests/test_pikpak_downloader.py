@@ -80,8 +80,8 @@ class FakeLauncher:
     def running_pids(self, image="PikPak.exe"):
         return [1] if self.running else []
 
-    def launch(self, exe, port):
-        self.launched.append((exe, port))
+    def launch(self, exe, port, hidden=True):
+        self.launched.append((exe, port) if hidden else (exe, port, "shown"))
         self.running = True
 
     def stop(self, image="PikPak.exe"):
@@ -234,6 +234,9 @@ def test_running_without_debug_port_is_not_relaunched():
     assert launcher.launched == []
     downloader.restart()  # only on an explicit request
     assert launcher.stopped == 1 and len(launcher.launched) == 1
+    shown = PikPakClientDownloader({"start_hidden": False}, bridge_factory=Down, launcher=FakeLauncher())
+    shown.ensure_running()
+    assert shown.launcher.launched[0][-1] == "shown"
 
 
 def test_auto_start_off_and_missing_exe():

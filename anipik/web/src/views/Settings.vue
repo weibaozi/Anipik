@@ -17,7 +17,13 @@ onMounted(async () => {
   try {
     const loaded = await api.settings()
     // Older saved values may lack newer keys; fill them so the form and change detection agree.
-    loaded['downloader.pikpak_client'] = { port: 19223, exe_path: '', auto_start: true, ...loaded['downloader.pikpak_client'] }
+    loaded['downloader.pikpak_client'] = {
+    port: 19223,
+    exe_path: '',
+    auto_start: true,
+    start_hidden: true,
+    ...loaded['downloader.pikpak_client'],
+  }
     settings.value = loaded
     original.value = JSON.stringify(settings.value)
   } catch (error) {
@@ -65,7 +71,8 @@ const moduleLabels: Record<string, string> = {
   path: '路径工具',
   download_action: '下载到本地',
 }
-const pikpak = () => settings.value!['downloader.pikpak_client'] as { port: number; exe_path: string; auto_start: boolean }
+const pikpak = () =>
+  settings.value!['downloader.pikpak_client'] as { port: number; exe_path: string; auto_start: boolean; start_hidden: boolean }
 
 const acting = ref(false)
 async function startClient() {
@@ -148,6 +155,11 @@ function restartClient() {
           <div>
             <n-switch v-model:value="pikpak().auto_start" />
             <div class="muted small">anipik 启动时、以及有下载任务但客户端没运行时，自动以调试端口启动 PikPak</div>
+          </div>
+          <label>最小化到托盘</label>
+          <div>
+            <n-switch v-model:value="pikpak().start_hidden" />
+            <div class="muted small">由 anipik 启动 / 重启时不弹出窗口，只在托盘显示（与客户端「开机自启」相同的方式），双击托盘图标可打开</div>
           </div>
           <label>调试端口</label>
           <n-input-number v-model:value="pikpak().port" :min="1" :max="65535" style="width: 140px" />

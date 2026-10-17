@@ -42,12 +42,18 @@ def running_pids(image="PikPak.exe"):
     return pids
 
 
-def launch(exe, port):
-    """Start the client with the debugging port bound to localhost only."""
-    subprocess.Popen([exe, f"--remote-debugging-port={int(port)}", "--remote-debugging-address=127.0.0.1"],
-                     cwd=os.path.dirname(exe), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+def launch(exe, port, hidden=True):
+    """Start the client with the debugging port bound to localhost only.
+
+    hidden: --openAsHidden is the flag the client's own "start at login" uses; the main
+    window is created (so the page and its modules load) but not shown, only the tray icon.
+    """
+    args = [exe, f"--remote-debugging-port={int(port)}", "--remote-debugging-address=127.0.0.1"]
+    if hidden:
+        args.append("--openAsHidden")
+    subprocess.Popen(args, cwd=os.path.dirname(exe), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, close_fds=True, creationflags=_DETACHED)
-    log.info("launched %s with debug port %s", exe, port)
+    log.info("launched %s with debug port %s%s", exe, port, " (tray only)" if hidden else "")
 
 
 def stop(image="PikPak.exe", timeout=15):

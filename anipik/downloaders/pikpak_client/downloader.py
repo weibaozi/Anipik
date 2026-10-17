@@ -54,6 +54,10 @@ class PikPakClientDownloader(Downloader):
     def port(self):
         return int(self.config.get("port", 19223))
 
+    @property
+    def start_hidden(self):
+        return bool(self.config.get("start_hidden", True))
+
     # -- client process --------------------------------------------------------------
     def _exe(self):
         return self.launcher.find_exe(self.config.get("exe_path") or None)
@@ -84,7 +88,7 @@ class PikPakClientDownloader(Downloader):
             return "PikPak 已在运行但没有开启调试端口：在设置页点「重启 PikPak」，或完全退出后由 anipik 启动"
         if time.time() - self._last_launch < LAUNCH_COOLDOWN:
             return "PikPak 正在启动，等待登录完成"
-        self.launcher.launch(exe, self.port)
+        self.launcher.launch(exe, self.port, hidden=self.start_hidden)
         self._last_launch = time.time()
         return "已启动 PikPak，等待登录完成"
 
@@ -94,7 +98,7 @@ class PikPakClientDownloader(Downloader):
         if not exe:
             raise ValueError("找不到 PikPak.exe，请在设置页填写客户端路径")
         self.launcher.stop(os.path.basename(exe))
-        self.launcher.launch(exe, self.port)
+        self.launcher.launch(exe, self.port, hidden=self.start_hidden)
         self._last_launch = time.time()
 
     def health(self):

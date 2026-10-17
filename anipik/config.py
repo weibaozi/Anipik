@@ -12,8 +12,9 @@ LEGACY_SETTING = ROOT / "setting.yaml"
 DEFAULT_SETTINGS = {
     "library_root": str(ROOT / "downloads"),
     "downloader": "pikpak_client",
-    # exe_path empty = look in the default install locations; auto_start launches it with the port.
-    "downloader.pikpak_client": {"port": 19223, "exe_path": "", "auto_start": True},
+    # exe_path empty = look in the default install locations; auto_start launches it with the port;
+    # start_hidden launches it to the tray only (the client's own --openAsHidden).
+    "downloader.pikpak_client": {"port": 19223, "exe_path": "", "auto_start": True, "start_hidden": True},
     "scan_interval": 600,
     "poll_interval": 5,
     "max_active_jobs": 5,
