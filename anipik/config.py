@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("ANIPIK_DATA", ROOT / "data"))
 DB_PATH = Path(os.environ.get("ANIPIK_DB", DATA_DIR / "anipik.db"))
 
-LEGACY_RSS = ROOT / "anime_rss.yaml"
+LEGACY_RSS = ROOT / "old" / "anime_rss.yaml"  # archived; already imported by `migrate`
 LEGACY_SETTING = ROOT / "setting.yaml"
 
 # Defaults for keys in the settings table; the table overrides them.
