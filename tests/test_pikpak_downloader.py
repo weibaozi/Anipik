@@ -13,6 +13,8 @@ class FakeBridge:
         self.cloud = {}      # task id -> task
         self.local = []      # local task dicts
         self.submissions = []
+        self.started = []
+        self.instance = "launch-1"
         self.fail_next = None
         self.files = [{"id": "f1", "size": 4, "name": "ep01.mkv", "parents": []},
                       {"id": "f2", "size": 2, "name": "sub.ass", "parents": [{"id": "d", "name": "Subs"}]}]
@@ -22,6 +24,14 @@ class FakeBridge:
 
     def close(self):
         pass
+
+    def instance_id(self):
+        return self.instance
+
+    def start_local_task(self, task_id):
+        self.started.append(task_id)
+        next(t for t in self.local if t["id"] == task_id)["status"] = "PENDING"
+        return True
 
     def _maybe_fail(self):
         if self.fail_next:
@@ -90,6 +100,33 @@ def test_full_flow(env, tmp_path):
     status = tick()
     assert status.state == "done" and state["phase"] == "done"
     assert bridge.submissions == [MAGNET]
+
+
+def _to_local_stage(bridge, tick):
+    tick()
+    bridge.cloud["t0"].update(phase="PHASE_TYPE_COMPLETE", file_id="root", progress=100)
+    tick()
+    assert len(bridge.local) == 2
+
+
+def test_resumes_tasks_paused_by_client_restart(env):
+    bridge, job, state, _, tick = env
+    _to_local_stage(bridge, tick)
+    for task in bridge.local:
+        task["status"] = "PAUSED"
+    bridge.instance = "launch-2"  # PikPak was restarted: unfinished tasks come back paused
+    tick()
+    assert sorted(bridge.started) == ["Lf1", "Lf2"] and state["client_instance"] == "launch-2"
+    assert state["phase"] == "local_waiting" and not state["wait_reason"]
+
+
+def test_respects_manual_pause(env):
+    bridge, job, state, _, tick = env
+    _to_local_stage(bridge, tick)
+    bridge.local[0]["status"] = "PAUSED"  # same client launch: the user paused it
+    tick()
+    tick()
+    assert bridge.started == [] and "手动暂停" in state["wait_reason"]
 
 
 def test_reuses_existing_cloud_task(env):

@@ -4,6 +4,7 @@ Ported from G:/study/others/pikpak/pikpak_queue.py process_job(). Sub-phases kep
 Job.state["phase"]: new, cloud_submitting, cloud_waiting, local_ready, local_submitting,
 local_waiting, done, failed.
 """
+import logging
 import os
 import time
 from contextlib import contextmanager
@@ -13,6 +14,8 @@ import websocket
 
 from ..base import Downloader, JobSpec, NeedsAttention, Status, TransientError
 from .bridge import BridgeError, PikPakBridge
+
+log = logging.getLogger(__name__)
 
 
 def expected_path(destination, file):
@@ -42,6 +45,7 @@ class PikPakClientDownloader(Downloader):
             port=self.config.get("port", 19223),
             modules=self.config.get("modules"), exports=self.config.get("exports")))
         self.bridge = None
+        self.instance = None  # id of the running client launch, refreshed every poll
 
     def health(self):
         bridge = self.bridge_factory()
@@ -61,6 +65,7 @@ class PikPakClientDownloader(Downloader):
         bridge = self.bridge_factory()
         try:
             bridge.connect()
+            self.instance = bridge.instance_id()
         except _TRANSPORT_ERRORS as exc:
             bridge.close()
             raise TransientError(f"PikPak client unreachable: {exc}") from exc
@@ -172,6 +177,16 @@ class PikPakClientDownloader(Downloader):
                 return
             missing.append(file)
 
+        # After a restart the client brings unfinished local tasks back paused. Resume those;
+        # a pause made while the same client launch kept running was the user's, so leave it.
+        paused = [t for t in active if t["status"] == "PAUSED"]
+        if paused and state.get("client_instance") != self.instance:
+            for task in paused:
+                bridge.start_local_task(task["id"])
+                task["status"] = "PENDING"
+            log.info("job %s: resumed %d local task(s) paused by a client restart", job.id, len(paused))
+        state["client_instance"] = self.instance
+
         total_bytes = max(1, sum(int(f["size"]) for f in files))
         state.update(local_completed=complete, local_total=len(files),
                      local_progress=round(downloaded_bytes / total_bytes * 100, 2),
@@ -192,5 +207,5 @@ class PikPakClientDownloader(Downloader):
         else:
             state["phase"] = "local_waiting"
             if any(t["status"] == "PAUSED" for t in active):
-                state["wait_reason"] = "Paused in PikPak"
+                state["wait_reason"] = "已在 PikPak 中手动暂停，继续下载需在客户端里恢复"
         checkpoint()

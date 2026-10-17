@@ -70,6 +70,10 @@ class PikPakBridge:
     def version(self):
         return self._http_json("/json/version")
 
+    def instance_id(self):
+        """Changes every time the client is launched (CDP browser target id)."""
+        return self.version().get("webSocketDebuggerUrl", "").rsplit("/", 1)[-1] or None
+
     def _js(self, template, **values):
         values = {**{f"m_{k}": v for k, v in self.modules.items()},
                   **{f"e_{k}": json.dumps(v) for k, v in self.exports.items()}, **values}
@@ -137,7 +141,8 @@ class PikPakBridge:
                 .every(k => typeof r($m_drive)[k] === 'function'));
             out.task_meta = has(() => typeof r($m_task_meta).A.get === 'function');
             out.task_enums = has(() => r($m_task_enums).KH.FILE_ID !== undefined && !!r($m_task_enums).wJ);
-            out.task_manager = has(() => typeof r($m_task_manager)._.getTaskManager === 'function');
+            out.task_manager = has(() => ['getTasks', 'startTask'].every(
+                k => typeof r($m_task_manager)._.getTaskManager()[k] === 'function'));
             out.task_status = has(() => typeof r($m_task_status).A === 'function');
             out.path = has(() => typeof r($m_path).join === 'function');
             out.download_action = r.m[$m_download_action] ? has(() => typeof r($m_download_action).A === 'function')
@@ -230,6 +235,13 @@ class PikPakBridge:
                     speed: t.getDownloadSpeed(), size: Number(b.fileSize) || 0, downloaded: Number(b.downloadSize) || 0};
             });
         })()""", ids=json.dumps(file_ids)))
+
+    def start_local_task(self, task_id):
+        """Resume a stopped/paused local task, like the client's own start button."""
+        return self.evaluate(self._js("""(async () => {
+            const tm = globalThis.__pikpakPythonRequire($m_task_manager)._.getTaskManager();
+            return !!(await tm.startTask($task_id));
+        })()""", task_id=json.dumps(task_id)))
 
     def download_files(self, files, destination):
         if not ntpath.isabs(destination):
