@@ -3,14 +3,18 @@ MioBT:
   expr: +
   rss_link: https://www.miobt.com/rss.xml
   suffix: .xml
-  tasks: {}
-末日动漫:
-  addon: https://share.acgnx.se/rss.xml?keyword=
-  expr: +
-  rss_link: https://share.acgnx.se/rss.xml
-  suffix: ''
   tasks:
-    我推的孩子:
+    战士久留美:
+      downloaded_episodes:
+      - 1
+      - 2
+      - 3
+      enable: true
+      keywords:
+      - 'ani 战士久留美 '
+      rule_name: 战士久留美
+      update time: null
+    药屋少女的呢喃s3:
       downloaded_episodes:
       - 1
       - 2
@@ -29,8 +33,113 @@ MioBT:
       - 15
       - 16
       - 17
+      - 18
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 26
+      - 27
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+      - 47
+      - 48
+      - 49
+      - 50
       enable: true
       keywords:
-      - ani 我推的孩子
-      rule_name: 我推的孩子
+      - 天月 药屋
+      rule_name: 药屋少女的呢喃s3
       update time: null
+    遭到流放的转生重骑士凭借游戏知识大开无双:
+      downloaded_episodes:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      enable: true
+      keywords:
+      - ani 遭到流放的转生重骑士凭借游戏知识大开无双
+      rule_name: 遭到流放的转生重骑士凭借游戏知识大开无双
+      update time: null
+Nyaa:
+  addon: https://nyaa.si/?page=rss&q=
+  expr: +
+  rss_link: https://nyaa.si/?page=rss
+  suffix: ''
+  tasks:
+    战队大失格s2:
+      downloaded_episodes:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 9
+      - 8
+      - 6
+      - 7
+      - 11
+      - 10
+      - 12
+      enable: true
+      keywords:
+      - DKB Sentai Daishikkaku S02
+      rule_name: 战队大失格s2
+      update time: null
+    超能立方:
+      downloaded_episodes:
+      - 8
+      - 6
+      - 7
+      - 5
+      - 3
+      - 4
+      - 1
+      - 2
+      - 9
+      - 264
+      - 11
+      - 12
+      enable: true
+      keywords:
+      - toonshub super cube S01 iQ
+      rule_name: 超能立方
+      update time: null
+末日动漫:
+  addon: https://share.acgnx.se/rss.xml?keyword=
+  expr: +
+  rss_link: https://share.acgnx.se/rss.xml
+  suffix: ''
+  tasks: {}

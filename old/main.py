@@ -30,6 +30,7 @@ notify_queue_dir = os.path.join(
 
 # print(message_queue)
 intervals = [60, 600, 3600, 7200, 10800]
+intervals = [60, 60, 60, 7200, 10800]
 
 def download_helper(url,name, download_episodes, episode_number, location=current_directory, stream=False):
     # url = download_url[1]
@@ -75,14 +76,16 @@ async def download_helper_id(download_queue_ids, stream=False,client=None):
             with lock:
                 download_episodes.append(episode_number)
 async def download_helper_id_to_tasks(download_queue_ids, stream=False,client=None):
+    # print(download_queue_ids)
     threads=[]
     for download_id, (download_episodes, episode_number, location) in download_queue_ids.items():
         for i, delay in enumerate(intervals, start=1):
             js = json.dumps(await client.offline_list(), indent=4)
+            # print(download_id,js)
             if download_id in js:
                 print(f"[{i}/5] file id:{download_id} has not been completed")
                 if i < len(intervals):  # don’t sleep after last attempt
-                    if delay >= 60:
+                    if delay > 60:
                         total = delay // 60   # minutes
                         unit = "min"
                         print(f"Sleeping for {total} {unit}...")
@@ -215,7 +218,7 @@ async def main():
                     print(rule_name, episode_number)
                     try:
                         file_ids = await magnet_to_file_ids(client=client, magnet_links=[url])
-                        # print(file_ids)
+                        print(file_ids)
 
                     except Exception as e:
                         print(e)

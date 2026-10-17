@@ -91,8 +91,9 @@ async def magnet_to_file_ids(magnet_links:List[str]=None,client: PikPakApi=None)
                 info = json.loads(info)
                 file_id = info['task']['file_id']
                 file_ids[magnet_link] = file_id
-                #print(file_id)
+                # print(info)
                 #print("=" * 30, end="\n\n")
+                # time.sleep(2)
             except Exception as e:
                 print(e)
                 continue
