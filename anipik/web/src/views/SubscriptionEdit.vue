@@ -5,6 +5,7 @@ import {
   NAlert,
   NButton,
   NCard,
+  NCheckbox,
   NEmpty,
   NIcon,
   NInput,
@@ -43,6 +44,8 @@ const libraryRoot = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const loadError = ref<string | null>(null)
+const originalDestination = ref<string | null>(null)
+const moveFiles = ref(true)
 
 onMounted(async () => {
   try {
@@ -51,6 +54,7 @@ onMounted(async () => {
     libraryRoot.value = settings.library_root
     if (editing.value) {
       const sub = await api.subscription(Number(props.id))
+      originalDestination.value = sub.destination
       form.value = {
         name: sub.name,
         enabled: sub.enabled,
@@ -127,6 +131,11 @@ const destination = computed(() => {
   return `${libraryRoot.value.replace(/[\\/]+$/, '')}\\${dir.replace(/\//g, '\\')}`
 })
 
+const folderChanged = computed(() => {
+  const norm = (p: string | null) => (p ?? '').replace(/[\\/]+/g, '\\').replace(/\\$/, '')
+  return editing.value && !!originalDestination.value && norm(originalDestination.value) !== norm(destination.value)
+})
+
 // --- bindings
 function addBinding(keyword?: string) {
   const used = new Set(form.value.bindings.map((b) => b.source_id))
@@ -152,9 +161,10 @@ async function save() {
   try {
     const body = { ...form.value, name: form.value.name.trim(), save_dir: form.value.save_dir?.trim() || null }
     const result = editing.value
-      ? await api.updateSubscription(Number(props.id), { ...body, start_episode: undefined })
+      ? await api.updateSubscription(Number(props.id), { ...body, start_episode: undefined, move_files: moveFiles.value })
       : await api.createSubscription(body)
-    message.success(editing.value ? '已保存' : '已创建订阅，正在扫描…')
+    if (result.moved) message.success(`已保存，并把文件夹移动到 ${result.moved.to}`)
+    else message.success(editing.value ? '已保存' : '已创建订阅，正在扫描…')
     router.push(`/sub/${result.id}`)
   } catch (error) {
     message.error(errorText(error))
@@ -222,6 +232,11 @@ async function save() {
               <n-button v-if="season" size="tiny" secondary @click="form.save_dir = `${season}/${form.name}`">{{ season }}/{{ form.name || '名称' }}</n-button>
             </div>
             <div v-if="destination" class="mono muted dest">{{ destination }}</div>
+            <n-alert v-if="folderChanged" type="info" :show-icon="false" class="move">
+              <n-checkbox v-model:checked="moveFiles">保存时把现有文件夹一起移动过去</n-checkbox>
+              <div class="mono small">{{ originalDestination }}<br />→ {{ destination }}</div>
+              <div class="small muted">旧文件夹不存在时只改设置；目标文件夹已有文件时不会移动</div>
+            </n-alert>
           </div>
           <template v-if="!editing">
             <label>从第几集开始</label>
@@ -351,6 +366,9 @@ async function save() {
 }
 .dest {
   margin-top: 6px;
+}
+.move {
+  margin-top: 8px;
 }
 .footer {
   display: flex;

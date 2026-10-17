@@ -1,5 +1,6 @@
 """HTTP API (/api) + the built web UI. Sync handlers: FastAPI runs them in a thread pool."""
 import logging
+import os
 import re
 import threading
 from contextlib import asynccontextmanager
@@ -15,6 +16,7 @@ from .. import bangumi, config, discord_bot
 from ..config import DEFAULT_SETTINGS
 from ..db import all_settings, session_scope, set_setting
 from ..downloaders import DOWNLOADERS, build_downloader
+from ..folders import FolderMoveError, move_folder, same_path
 from ..matcher import is_batch, matches_filters, parse_episode
 from ..models import Episode, Job, Source, SourceBinding, Subscription
 from ..scheduler import destination_for
@@ -212,7 +214,9 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None
     def update_subscription(sub_id: int, body: SubscriptionPatch):
         with session_scope(factory) as session:
             sub = get_or_404(session, Subscription, sub_id)
-            data = body.model_dump(exclude_unset=True, exclude={"bindings"})
+            root = all_settings(session)["library_root"]
+            old_destination = destination_for(root, sub)
+            data = body.model_dump(exclude_unset=True, exclude={"bindings", "move_files"})
             if "name" in data:
                 check_name(session, data["name"], sub.id)
             for key, value in data.items():
@@ -220,9 +224,27 @@ def create_app(factory, scheduler=None, run_scheduler=False, sync=None, bot=None
             if body.bindings is not None:
                 apply_bindings(session, sub, body.bindings)
             sub.updated_at = datetime.now()
+            new_destination = destination_for(root, sub)
+            moved = None
+            if body.move_files and old_destination != new_destination and os.path.isdir(old_destination):
+                jobs = [j for e in sub.episodes for j in e.jobs]
+                if any(j.phase in ACTIVE for j in jobs):
+                    raise HTTPException(409, "有下载正在写入旧文件夹，等下载完成后再改保存目录")
+                try:
+                    # Before commit: if the move fails, the new save_dir is rolled back too.
+                    result = move_folder(old_destination, new_destination)
+                except FolderMoveError as exc:
+                    raise HTTPException(409, str(exc))
+                except OSError as exc:
+                    raise HTTPException(500, f"移动文件夹失败：{exc}")
+                if result == "moved":
+                    moved = {"from": old_destination, "to": new_destination}
+                    for job in jobs:
+                        if same_path(job.destination, old_destination):
+                            job.destination = new_destination
             session.flush()
             session.refresh(sub)
-            return subscription_out(sub, detail=True, root=all_settings(session)["library_root"])
+            return {**subscription_out(sub, detail=True, root=root), "moved": moved}
 
     @api.delete("/subscriptions/{sub_id}", status_code=204)
     def delete_subscription(sub_id: int):

@@ -68,6 +68,7 @@ export interface Subscription extends Metadata {
 
 export interface SubscriptionDetail extends Subscription {
   destination: string | null
+  moved?: { from: string; to: string } | null
   bindings: Binding[]
   episodes: Episode[]
 }
@@ -185,7 +186,7 @@ export const api = {
   subscriptions: () => request<Subscription[]>('GET', '/subscriptions'),
   subscription: (id: number) => request<SubscriptionDetail>('GET', `/subscriptions/${id}`),
   createSubscription: (body: SubscriptionInput) => request<SubscriptionDetail>('POST', '/subscriptions', body),
-  updateSubscription: (id: number, body: Partial<SubscriptionInput>) =>
+  updateSubscription: (id: number, body: Partial<SubscriptionInput> & { move_files?: boolean }) =>
     request<SubscriptionDetail>('PATCH', `/subscriptions/${id}`, body),
   deleteSubscription: (id: number) => request<void>('DELETE', `/subscriptions/${id}`),
   markEpisodes: (id: number, numbers: number[], status: 'done' | 'skipped' | 'delete') =>

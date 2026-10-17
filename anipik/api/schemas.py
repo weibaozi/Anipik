@@ -33,6 +33,7 @@ class SubscriptionPatch(Metadata):
     enabled: Optional[bool] = None
     save_dir: Optional[str] = None
     bindings: Optional[list[BindingIn]] = None  # replaces all bindings when given
+    move_files: bool = True  # move the existing folder when save_dir changes
 
 
 class EpisodesPatch(BaseModel):
