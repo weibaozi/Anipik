@@ -83,7 +83,7 @@ const pikpak = () => settings.value!['downloader.pikpak_client'] as { port: numb
         </n-alert>
         <div v-if="health?.modules" class="modules">
           <div v-for="(value, key) in health.modules" :key="key" class="module">
-            <span :class="value === true || String(value).startsWith('lazy') ? 'ok' : 'bad'">{{ value === true || String(value).startsWith('lazy') ? '✓' : '✗' }}</span>
+            <span :class="value === true ? 'ok' : 'bad'">{{ value === true ? '✓' : '✗' }}</span>
             {{ moduleLabels[key] ?? key }}
             <span v-if="value !== true" class="muted small">{{ value }}</span>
           </div>

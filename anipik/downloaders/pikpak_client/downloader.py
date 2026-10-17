@@ -53,7 +53,7 @@ class PikPakClientDownloader(Downloader):
             info = {"version": bridge.version().get("User-Agent", "")}
             bridge.connect()
             info["modules"] = bridge.probe()
-            info["ok"] = all(v is True or str(v).startswith("lazy") for v in info["modules"].values())
+            info["ok"] = all(v is True for v in info["modules"].values())
             return info
         except _TRANSPORT_ERRORS as exc:
             return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
@@ -200,6 +200,9 @@ class PikPakClientDownloader(Downloader):
                                      "before retrying to avoid duplicates")
             for file in missing:
                 expected_path(job.destination, file).parent.mkdir(parents=True, exist_ok=True)
+            # Fail before the checkpoint if the client can't download at all (e.g. after an
+            # update), so the job isn't left looking like an uncertain submission.
+            bridge.ensure_module("download_action")
             state["phase"] = "local_submitting"
             checkpoint()
             bridge.download_files(missing, job.destination)

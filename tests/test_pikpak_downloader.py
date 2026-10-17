@@ -25,6 +25,9 @@ class FakeBridge:
     def close(self):
         pass
 
+    def ensure_module(self, name):
+        pass
+
     def instance_id(self):
         return self.instance
 

@@ -4,15 +4,18 @@ Ported from G:/study/others/pikpak/pikpak_bridge.py. Start the client with
 `PikPak.exe --remote-debugging-port=19223 --remote-debugging-address=127.0.0.1`.
 No credentials are exported. Keep the debugging port local.
 
-The webpack module ids / export names below are specific to the inspected client build
-(2.14.x). When the client updates they may move; override them via the setting
-`downloader.pikpak_client` -> {"modules": {...}, "exports": {...}} and check with
-`python -m anipik probe`.
+The webpack module ids / export names below were inspected on client 2.14.x and still
+hold on 2.15.x. Lazy chunks are renumbered between builds, so the chunk holding
+download_action is found by scanning the installed client's chunk files. If ids move,
+override them via the setting `downloader.pikpak_client` -> {"modules": {...},
+"exports": {...}} and check with `python -m anipik probe`.
 """
 import json
 import ntpath
 import re
+import urllib.parse
 import urllib.request
+from pathlib import Path
 from string import Template
 
 import websocket
@@ -26,9 +29,10 @@ MODULES = {
     "task_manager": 69025,    # ._.getTaskManager()
     "task_status": 76442,     # .A(taskId) -> status code
     "path": 76760,            # .join
-    "download_action": 19574, # .A(files, destination): the official "Download" action
-    "download_chunk": 2312,   # lazy chunk containing download_action
+    "download_action": 19574, # .A(files, destination): the official "Download" action (lazy)
+    "download_chunk": None,   # optional fixed chunk id; None = find it in the client's files
 }
+_CHUNK_CACHE = {}  # (chunk dir, module id) -> chunk ids that contain it
 EXPORTS = {
     "add_task": "x3",
     "list_tasks": "x1",
@@ -60,6 +64,7 @@ class PikPakBridge:
         self.exports = {**EXPORTS, **(exports or {})}
         self.ws = None
         self.sequence = 0
+        self.renderer_url = None
 
     # -- transport ---------------------------------------------------------------
     def _http_json(self, path):
@@ -87,6 +92,7 @@ class PikPakBridge:
                 target["webSocketDebuggerUrl"], timeout=self.timeout, suppress_origin=True,
                 http_no_proxy=["127.0.0.1", "localhost"],
             )
+            self.renderer_url = target["url"]
             try:
                 ready = self.evaluate(self._js("""(() => {
                     if (!globalThis.webpackChunkpikpak_web) return false;
@@ -131,10 +137,55 @@ class PikPakBridge:
             finally:
                 self.ws = None
 
+    # -- lazy modules ------------------------------------------------------------
+    def _chunk_dir(self):
+        url = urllib.parse.urlsplit(self.renderer_url or "")
+        if url.scheme != "file":
+            raise BridgeError(f"cannot locate client files from {self.renderer_url!r}")
+        return Path(urllib.request.url2pathname(url.path)).parent / "chunk"
+
+    def chunks_containing(self, module_id):
+        """Chunk ids whose file defines module_id ("12345(e,t,n){" or older "12345:function")."""
+        directory = self._chunk_dir()
+        key = (str(directory), module_id)
+        if key not in _CHUNK_CACHE:
+            pattern = re.compile(r"[{,]%d[(:]" % module_id)
+            found = []
+            for file in sorted(directory.glob("*.js")):
+                chunk = file.name.split(".", 1)[0]
+                if chunk.isdigit() and pattern.search(file.read_text(encoding="utf-8", errors="replace")):
+                    found.append(int(chunk))
+            _CHUNK_CACHE[key] = found
+        return _CHUNK_CACHE[key]
+
+    def ensure_module(self, name):
+        """Load the lazy chunk holding a module, the way the client does on first use."""
+        module_id = self.modules[name]
+        loaded = "!!globalThis.__pikpakPythonRequire.m[%d]" % module_id
+        if self.evaluate(loaded):
+            return
+        fixed = self.modules.get("download_chunk") if name == "download_action" else None
+        candidates = ([fixed] if fixed else []) + self.chunks_containing(module_id)
+        for chunk in dict.fromkeys(candidates):
+            try:
+                self.evaluate("globalThis.__pikpakPythonRequire.e(%d).then(() => true)" % chunk)
+            except BridgeError:
+                continue
+            if self.evaluate(loaded):
+                return
+        _CHUNK_CACHE.pop((str(self._chunk_dir()), module_id), None)
+        raise BridgeError(f"module {name} ({module_id}) not found in the client's chunks "
+                          f"(tried {candidates or 'none'}); the client changed, see python -m anipik probe")
+
     # -- diagnostics -------------------------------------------------------------
     def probe(self):
-        """Check every module/export this bridge relies on. Read-only."""
-        return self.evaluate(self._js("""(() => {
+        """Check every module/export this bridge relies on. Loads lazy chunks; changes nothing."""
+        try:
+            self.ensure_module("download_action")
+            lazy_error = None
+        except BridgeError as exc:
+            lazy_error = str(exc)
+        result = self.evaluate(self._js("""(() => {
             const r = globalThis.__pikpakPythonRequire, out = {};
             const has = (fn) => { try { return !!fn(); } catch (e) { return String(e); } };
             out.drive = has(() => [$e_add_task, $e_list_tasks, $e_get_task, $e_get_file, $e_list_files]
@@ -145,10 +196,12 @@ class PikPakBridge:
                 k => typeof r($m_task_manager)._.getTaskManager()[k] === 'function'));
             out.task_status = has(() => typeof r($m_task_status).A === 'function');
             out.path = has(() => typeof r($m_path).join === 'function');
-            out.download_action = r.m[$m_download_action] ? has(() => typeof r($m_download_action).A === 'function')
-                                                            : 'lazy (loaded on first download)';
+            out.download_action = has(() => typeof r($m_download_action).A === 'function');
             return out;
         })()"""))
+        if lazy_error:
+            result["download_action"] = lazy_error
+        return result
 
     # -- cloud -------------------------------------------------------------------
     def _call(self, export, argument):
@@ -247,9 +300,8 @@ class PikPakBridge:
         if not ntpath.isabs(destination):
             raise ValueError("Destination must be absolute")
         # Uses the same high-level function as the official Download action.
+        self.ensure_module("download_action")
         self.evaluate(self._js("""(async () => {
-            const r = globalThis.__pikpakPythonRequire;
-            if (!r.m[$m_download_action]) await r.e($m_download_chunk);
-            await r($m_download_action).A($files, $destination);
+            await globalThis.__pikpakPythonRequire($m_download_action).A($files, $destination);
             return true;
         })()""", files=json.dumps(files), destination=json.dumps(destination)))
