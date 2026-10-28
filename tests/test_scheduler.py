@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from anipik.db import session_scope, set_setting
 from anipik.downloaders import Downloader, NeedsAttention, Status, TransientError
+from anipik.matcher import info_hash_from_magnet
 from anipik.models import Episode, Job, Source, SourceBinding, Subscription
 from anipik.scheduler import Scheduler
 from anipik.sources import SOURCE_KINDS, Release, SourceKind
@@ -21,7 +22,7 @@ class FakeSource(SourceKind):
 
 
 class ScriptedDownloader(Downloader):
-    """advance() pops the next scripted outcome for the job's URL."""
+    """advance() pops the next scripted outcome for the job's info hash."""
     name = "scripted"
 
     def __init__(self):
@@ -36,7 +37,7 @@ class ScriptedDownloader(Downloader):
 
     def advance(self, job, state, checkpoint):
         self.calls.append(job.url)
-        outcome = self.script[job.url].pop(0)
+        outcome = self.script[info_hash_from_magnet(job.url)].pop(0)
         state["ticks"] = state.get("ticks", 0) + 1
         checkpoint()
         if isinstance(outcome, Exception):
@@ -68,7 +69,7 @@ def setup(factory, tmp_path):
 
 def jobs(factory):
     with session_scope(factory) as s:
-        return [(j.episode.number, j.phase, j.url[-40:], j.state) for j in s.scalars(select(Job).order_by(Job.id))]
+        return [(j.episode.number, j.phase, info_hash_from_magnet(j.url), j.state) for j in s.scalars(select(Job).order_by(Job.id))]
 
 
 def episodes(factory):
@@ -100,7 +101,7 @@ def test_poll_lifecycle_slots_and_retry(setup, factory):
     FEEDS["p"] = [Release(f"[A] Show - 0{n}", f"magnet:?xt=urn:btih:{h}") for n, h in ((2, H2), (3, H3), (4, H1))]
     FEEDS["b"] = []
     scheduler.scan()
-    url = {n: f"magnet:?xt=urn:btih:{h}" for n, h in ((2, H2), (3, H3), (4, H1))}
+    url = {2: H2, 3: H3, 4: H1}
     downloader.script = {url[2]: [Status("running", 10), Status("done", 100)],
                          url[3]: [Status("failed", 0, "cloud error")],
                          url[4]: [NeedsAttention("unknown submission")]}
@@ -131,7 +132,7 @@ def test_backend_down_does_not_count_against_jobs(setup, factory):
         job = s.scalar(select(Job))
         assert (job.phase, job.transient_errors, job.message) == ("running", 0, "down")
     downloader.reachable = True
-    downloader.script = {job.url: [TransientError("blip"), Status("done")]}
+    downloader.script = {info_hash_from_magnet(job.url): [TransientError("blip"), Status("done")]}
     scheduler.poll()
     with session_scope(factory) as s:
         assert s.scalar(select(Job)).transient_errors == 1
@@ -148,3 +149,14 @@ def test_destination_for_subfolders_and_absolute():
     assert destination_for(r"N:\新番", NS(save_dir="../../escape", name="x")) == r"N:\新番\escape"
     assert destination_for(r"N:\新番", NS(save_dir=None, name="Show")) == r"N:\新番\Show"
     assert destination_for(r"N:\新番", NS(save_dir="D:/Other/Show", name="x")) == r"D:\Other\Show"
+
+
+def test_jobs_carry_the_release_title_as_dn(setup, factory):
+    scheduler, _ = setup
+    FEEDS["p"], FEEDS["b"] = [Release("[A] Show - 02 [1080p]", f"magnet:?xt=urn:btih:{H2}"),
+                              Release("[A] Show - 03", "https://p/3.torrent", info_hash=H3)], []
+    scheduler.scan()
+    with session_scope(factory) as s:
+        urls = [j.url for j in s.scalars(select(Job).order_by(Job.id))]
+    assert urls == [f"magnet:?xt=urn:btih:{H2}&dn=%5BA%5D+Show+-+02+%5B1080p%5D",
+                    f"magnet:?xt=urn:btih:{H3}&dn=%5BA%5D+Show+-+03"]

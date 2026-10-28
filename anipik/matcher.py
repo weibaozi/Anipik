@@ -95,5 +95,27 @@ def normalize_magnet(magnet):
     return f"magnet:?xt=urn:btih:{digest}{tail}"
 
 
-def magnet_from_hash(digest):
-    return f"magnet:?xt=urn:btih:{digest.lower()}"
+def magnet_from_hash(digest, name=None, trackers=()):
+    """Bare hashes leave PikPak naming the task after the hash; dn gives it the release title."""
+    params = ([("dn", name)] if name else []) + [("tr", t) for t in trackers]
+    tail = ("&" + urlencode(params)) if params else ""
+    return f"magnet:?xt=urn:btih:{digest.lower()}{tail}"
+
+
+def with_display_name(magnet, name):
+    """Add dn to a magnet that lacks one."""
+    if not name or any(k == "dn" for k, _ in parse_qsl(magnet[len("magnet:?"):])):
+        return magnet
+    return f"{magnet}&{urlencode([('dn', name)])}"
+
+
+def magnet_from_torrent(data: bytes, name=None):
+    """Magnet for a .torrent file, keeping its trackers so PikPak can fetch the metadata quickly."""
+    torrent = bencodepy.decode(data)
+    trackers = []
+    for url in [torrent.get(b"announce")] + [u for tier in torrent.get(b"announce-list", []) for u in tier]:
+        url = url.decode("utf-8", "replace").strip() if isinstance(url, bytes) else None
+        if url and url not in trackers:
+            trackers.append(url)
+    digest = hashlib.sha1(bencodepy.encode(torrent[b"info"])).hexdigest()
+    return magnet_from_hash(digest, name or torrent[b"info"].get(b"name", b"").decode("utf-8", "replace"), trackers)

@@ -1,9 +1,11 @@
 import bencodepy
 import hashlib
+from urllib.parse import parse_qs
+
 import pytest
 
-from anipik.matcher import (info_hash_from_magnet, info_hash_from_torrent, matches_filters, normalize_magnet,
-                            parse_episode)
+from anipik.matcher import (info_hash_from_magnet, info_hash_from_torrent, magnet_from_torrent, matches_filters,
+                            normalize_magnet, parse_episode, with_display_name)
 from anipik.sources.rss_search import RssSearchSource, parse_feed
 
 
@@ -43,6 +45,21 @@ def test_torrent_hash():
     info = {b"name": b"x", b"length": 1, b"piece length": 16384, b"pieces": b"0" * 20}
     data = bencodepy.encode({b"info": info, b"announce": b"http://t"})
     assert info_hash_from_torrent(data) == hashlib.sha1(bencodepy.encode(info)).hexdigest()
+
+
+def test_magnets_carry_the_release_title():
+    info = {b"name": b"x.mp4", b"length": 1, b"piece length": 16384, b"pieces": b"0" * 20}
+    data = bencodepy.encode({b"info": info, b"announce": b"http://t/announce\r",
+                             b"announce-list": [[b"http://t/announce"], [b"udp://u:80"]]})
+    title = "[黒ネズミたち] 乱世千金 - 04 [1080p]"
+    magnet = magnet_from_torrent(data, title)
+    params = parse_qs(magnet[len("magnet:?"):])
+    assert params["dn"] == [title] and params["tr"] == ["http://t/announce", "udp://u:80"]
+    assert info_hash_from_magnet(magnet) == hashlib.sha1(bencodepy.encode(info)).hexdigest()
+    assert parse_qs(magnet_from_torrent(data)[len("magnet:?"):])["dn"] == ["x.mp4"]
+    bare = "magnet:?xt=urn:btih:eaa37fa1ec759c2e7132183b6db28820003943d1"
+    assert parse_qs(with_display_name(bare, title)[len("magnet:?"):])["dn"] == [title]
+    assert with_display_name(bare + "&dn=keep", title) == bare + "&dn=keep"
 
 
 def test_filters():

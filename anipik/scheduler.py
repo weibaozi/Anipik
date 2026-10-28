@@ -15,8 +15,8 @@ from sqlalchemy import select
 
 from .db import all_settings, get_setting, session_scope, set_setting
 from .downloaders import JobSpec, NeedsAttention, TransientError, build_downloader
-from .matcher import (info_hash_from_magnet, info_hash_from_torrent, magnet_from_hash, matches_filters,
-                      normalize_magnet, parse_episode)
+from .matcher import (info_hash_from_magnet, magnet_from_hash, magnet_from_torrent, matches_filters,
+                      normalize_magnet, parse_episode, with_display_name)
 from .models import Episode, Job, Subscription
 from .notifiers import build_notifiers, notify
 from .sources import Http, SourceError, build_source
@@ -75,11 +75,13 @@ class Scheduler:
             notify(notifiers, message)
 
     def resolve_magnet(self, release):
+        # Always carry dn = release title, or PikPak names the task after the hash.
         if release.url.startswith("magnet:?"):
-            return normalize_magnet(release.url)
+            magnet = normalize_magnet(release.url)
+            return magnet and with_display_name(magnet, release.title)
         if release.info_hash:
-            return magnet_from_hash(release.info_hash)
-        return magnet_from_hash(info_hash_from_torrent(self.http.get(release.url)))
+            return magnet_from_hash(release.info_hash, release.title)
+        return magnet_from_torrent(self.http.get(release.url), release.title)
 
     # -- scan --------------------------------------------------------------------
     def scan(self, dry_run=False, subscription_ids=None):
